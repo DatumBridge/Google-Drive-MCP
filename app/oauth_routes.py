@@ -99,23 +99,23 @@ async def oauth_callback(request: Request):
         return RedirectResponse(f"{base_url}/test?oauth_error=config")
 
     try:
-        from urllib.request import Request as UrlRequest, urlopen
+        import requests
 
-        body = urlencode({
+        body = {
             "code": code,
             "client_id": client_id,
             "client_secret": client_secret,
             "redirect_uri": redirect_uri,
             "grant_type": "authorization_code",
-        })
-        req = UrlRequest(
+        }
+        resp = requests.post(
             "https://oauth2.googleapis.com/token",
-            data=body.encode(),
-            method="POST",
+            data=body,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=30,
         )
-        with urlopen(req) as resp:
-            token_data = json.loads(resp.read().decode())
+        resp.raise_for_status()
+        token_data = resp.json()
     except Exception:
         return RedirectResponse(f"{base_url}/test?oauth_error=exchange")
 
