@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Drive MCP - Test UI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    h1 { color: #00d9ff; margin-bottom: 0.5rem; }
+    .subtitle { color: #888; margin-bottom: 2rem; }
+    .section {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .section h2 { margin-top: 0; color: #00d9ff; font-size: 1rem; }
+    label { display: block; margin-bottom: 0.25rem; color: #aaa; font-size: 0.9rem; }
+    input, textarea, select {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f1a;
+      color: #eee;
+    }
+    textarea { min-height: 80px; font-family: monospace; }
+    button {
+      background: #00d9ff;
+      color: #1a1a2e;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #00b8d9; }
+    button:disabled { background: #444; cursor: not-allowed; }
+    .result {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #0f0f1a;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .result.success { border-left: 4px solid #4ade80; }
+    .result.error { border-left: 4px solid #f87171; }
+    .status { font-size: 0.8rem; color: #888; margin-bottom: 1rem; }
+    .credentials-note { background: #2d2d44; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>Google Drive MCP Test UI</h1>
+  <p class="subtitle">Manually test all 7 MCP tools</p>
+
+  <div class="section" style="border: 2px solid #00d9ff;">
+    <h2>Connect with Google (OAuth – Personal Drive)</h2>
+    <p style="color:#aaa;font-size:0.9rem;margin-bottom:1rem;">Sign in with your Google account. Files will appear in your personal Drive. Token is saved to this browser (survives refresh).</p>
+    <p style="color:#888;font-size:0.85rem;margin-bottom:0.5rem;">If you get redirect_uri_mismatch: add the redirect URI from <a href="/oauth/info" target="_blank" style="color:#00d9ff;">/oauth/info</a> to Google Cloud Console → Credentials → OAuth client → Authorized redirect URIs.</p>
+    <button onclick="window.location.href='/oauth/start'">Connect with Google</button>
+    <button onclick="clearOAuth()" style="background:#444;margin-left:0.5rem;">Clear OAuth</button>
+    <div id="oauth-status" class="result" style="display:none;margin-top:1rem;"></div>
+  </div>
+
+  <div class="credentials-note">
+    <strong>Credentials:</strong> Click "Connect with Google" above, or run <code>python scripts/oauth_connect.py</code> to get an OAuth token. Token is auto-filled in all forms.
+  </div>
+
+  <div class="section">
+    <h2>Create Folder</h2>
+    <label>Folder Name</label>
+    <input type="text" id="create-folder-name" value="mcp-test-folder" placeholder="my-folder">
+    <label>Credentials Path (optional)</label>
+    <input type="text" id="create-folder-path" placeholder="token.json">
+    <label>Credentials JSON (optional, if no path)</label>
+    <textarea id="create-folder-json" placeholder='OAuth token from Connect with Google'></textarea>
+    <button onclick="callCreateFolder()">Create Folder</button>
+    <div id="create-folder-result" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="section">
+    <h2>List Files</h2>
+    <label>Folder ID (leave empty for root)</label>
+    <input type="text" id="list-folder-id" placeholder="root">
+    <label>Credentials Path</label>
+    <input type="text" id="list-path" placeholder="token.json">
+    <label>Credentials JSON (optional)</label>
+    <textarea id="list-json" placeholder=""></textarea>
+    <button onclick="callListFiles()">List Files</button>
+    <div id="list-result" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="section">
+    <h2>Upload File</h2>
+    <label>File Name</label>
+    <input type="text" id="upload-name" value="test.txt" placeholder="myfile.txt">
+    <label>Content (text)</label>
+    <textarea id="upload-content" placeholder="Hello World">Hello from MCP Test UI</textarea>
+    <label>Parent Folder ID (optional)</label>
+    <input type="text" id="upload-parent" placeholder="">
+    <label>Credentials Path</label>
+    <input type="text" id="upload-path" placeholder="token.json">
+    <label>Credentials JSON (optional)</label>
+    <textarea id="upload-json"></textarea>
+    <button onclick="callUploadFile()">Upload File</button>
+    <div id="upload-result" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="section">
+    <h2>Get File Metadata</h2>
+    <label>File ID</label>
+    <input type="text" id="meta-file-id" placeholder="1abc...">
+    <label>Credentials Path</label>
+    <input type="text" id="meta-path" placeholder="token.json">
+    <label>Credentials JSON (optional)</label>
+    <textarea id="meta-json"></textarea>
+    <button onclick="callGetMetadata()">Get Metadata</button>
+    <div id="meta-result" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="section">
+    <h2>Download File</h2>
+    <label>File ID</label>
+    <input type="text" id="download-file-id" placeholder="1abc...">
+    <label>As Text</label>
+    <select id="download-as-text"><option value="true">Yes</option><option value="false">No</option></select>
+    <label>Credentials Path</label>
+    <input type="text" id="download-path" placeholder="token.json">
+    <label>Credentials JSON (optional)</label>
+    <textarea id="download-json"></textarea>
+    <button onclick="callDownloadFile()">Download File</button>
+    <div id="download-result" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="section">
+    <h2>Move File</h2>
+    <label>File ID</label>
+    <input type="text" id="move-file-id" placeholder="">
+    <label>New Parent Folder ID</label>
+    <input type="text" id="move-parent-id" placeholder="">
+    <label>Credentials Path</label>
+    <input type="text" id="move-path" placeholder="token.json">
+    <label>Credentials JSON (optional)</label>
+    <textarea id="move-json"></textarea>
+    <button onclick="callMoveFile()">Move File</button>
+    <div id="move-result" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="section">
+    <h2>Delete File</h2>
+    <label>File ID</label>
+    <input type="text" id="delete-file-id" placeholder="">
+    <label>Credentials Path</label>
+    <input type="text" id="delete-path" placeholder="token.json">
+    <label>Credentials JSON (optional)</label>
+    <textarea id="delete-json"></textarea>
+    <button onclick="callDeleteFile()">Delete File</button>
+    <div id="delete-result" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script>
+    const MCP_URL = window.location.origin + '/mcp/';
+    let requestId = 1;
+    let sessionId = null;
+
+    function getCredentials(pathId, jsonId) {
+      const path = document.getElementById(pathId)?.value?.trim();
+      const json = document.getElementById(jsonId)?.value?.trim();
+      const args = {};
+      // Prefer credentials_json when present (OAuth from "Connect with Google" or pasted token).
+      // credentials_path is used only when json is empty, so Personal Drive OAuth takes precedence.
+      if (json) {
+        args.credentials_json = json;
+      } else if (path) {
+        args.credentials_path = path;
+      }
+      return args;
+    }
+
+    async function ensureSession() {
+      if (sessionId) return;
+      const res = await fetch(MCP_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 0,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'test-ui', version: '1.0' },
+          },
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Initialize failed: HTTP ${res.status}`);
+      }
+      sessionId = res.headers.get('mcp-session-id') || res.headers.get('Mcp-Session-Id');
+      if (!sessionId) {
+        const text = await res.text();
+        let data;
+        try {
+          data = (text.includes('event:') || text.includes('data:')) ? parseSSE(text) : JSON.parse(text);
+        } catch (_) {
+          data = {};
+        }
+        if (data.error) throw new Error(data.error.message || 'Initialize failed');
+        throw new Error('No session ID in response. Check server supports Streamable HTTP.');
+      }
+      await fetch(MCP_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
+          'Mcp-Session-Id': sessionId,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'notifications/initialized',
+        }),
+      });
+      const st = document.getElementById('status');
+      if (st) st.textContent = 'Server: ok | Session: connected';
+    }
+
+    async function mcpCall(method, params) {
+      await ensureSession();
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'Mcp-Session-Id': sessionId,
+      };
+      const res = await fetch(MCP_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: requestId++,
+          method,
+          params: params || {},
+        }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 404 && sessionId) {
+          sessionId = null;
+          return mcpCall(method, params);
+        }
+        throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      }
+
+      const text = await res.text();
+      let data;
+      if (text.includes('event:') || text.includes('data:')) {
+        data = parseSSE(text);
+      } else {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error('Invalid response: ' + text.slice(0, 200));
+        }
+      }
+      if (data.error) {
+        throw new Error(data.error.message || JSON.stringify(data.error));
+      }
+      return data.result;
+    }
+
+    function parseSSE(text) {
+      const lines = text.split(/\r?\n/);
+      let lastData = null;
+      let dataBuffer = [];
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          dataBuffer.push(line.slice(5).trimStart());
+        } else if (line === '' && dataBuffer.length > 0) {
+          const jsonStr = dataBuffer.join('\n').trim();
+          dataBuffer = [];
+          if (jsonStr && jsonStr !== '[DONE]') {
+            try {
+              lastData = JSON.parse(jsonStr);
+            } catch (_) {}
+          }
+        } else if (dataBuffer.length > 0 && !line.startsWith('data:')) {
+          const jsonStr = dataBuffer.join('\n').trim();
+          dataBuffer = [];
+          if (jsonStr && jsonStr !== '[DONE]') {
+            try {
+              lastData = JSON.parse(jsonStr);
+            } catch (_) {}
+          }
+        }
+      }
+      if (dataBuffer.length > 0) {
+        const jsonStr = dataBuffer.join('\n').trim();
+        if (jsonStr) {
+          try {
+            lastData = JSON.parse(jsonStr);
+          } catch (_) {}
+        }
+      }
+      if (!lastData) {
+        throw new Error('Could not parse SSE response. Raw: ' + text.slice(0, 300));
+      }
+      return lastData;
+    }
+
+    const OAUTH_STORAGE_KEY = 'google_drive_oauth_token';
+    const CREDENTIAL_JSON_IDS = ['create-folder-json','list-json','upload-json','meta-json','download-json','move-json','delete-json'];
+    const PATH_IDS = ['create-folder-path','list-path','upload-path','meta-path','download-path','move-path','delete-path'];
+
+    function showResult(elId, data, isError) {
+      const el = document.getElementById(elId);
+      el.style.display = 'block';
+      el.className = 'result ' + (isError ? 'error' : 'success');
+      let text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      if (!isError && data && data.web_view_link) {
+        text = text + '\n\nOpen in Drive: ' + data.web_view_link;
+      }
+      el.textContent = text;
+    }
+
+    function clearOAuth() {
+      try {
+        localStorage.removeItem(OAUTH_STORAGE_KEY);
+        for (const id of CREDENTIAL_JSON_IDS) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        }
+        for (const id of PATH_IDS) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        }
+        document.getElementById('oauth-status').style.display = 'block';
+        document.getElementById('oauth-status').className = 'result';
+        document.getElementById('oauth-status').textContent = 'OAuth cleared. Connect with Google to use Personal Drive.';
+      } catch (e) {}
+    }
+
+    async function callCreateFolder() {
+      const resultEl = document.getElementById('create-folder-result');
+      try {
+        const args = {
+          folder_name: document.getElementById('create-folder-name').value || 'mcp-test-folder',
+          ...getCredentials('create-folder-path', 'create-folder-json'),
+        };
+        const result = await mcpCall('tools/call', { name: 'create_folder', arguments: args });
+        const content = result?.content?.[0]?.text;
+        const data = content ? JSON.parse(content) : result;
+        showResult('create-folder-result', data, !data?.success);
+      } catch (e) {
+        showResult('create-folder-result', e.message, true);
+      }
+    }
+
+    async function callListFiles() {
+      try {
+        const folderId = document.getElementById('list-folder-id').value?.trim();
+        const args = { ...getCredentials('list-path', 'list-json') };
+        if (folderId) args.folder_id = folderId;
+        const result = await mcpCall('tools/call', { name: 'list_files', arguments: args });
+        const content = result?.content?.[0]?.text;
+        const data = content ? JSON.parse(content) : result;
+        showResult('list-result', data, !data?.success);
+      } catch (e) {
+        showResult('list-result', e.message, true);
+      }
+    }
+
+    async function callUploadFile() {
+      try {
+        const content = document.getElementById('upload-content').value;
+        const b64 = btoa(unescape(encodeURIComponent(content)));
+        const args = {
+          file_name: document.getElementById('upload-name').value || 'test.txt',
+          content_base64: b64,
+          ...getCredentials('upload-path', 'upload-json'),
+        };
+        const parent = document.getElementById('upload-parent').value?.trim();
+        if (parent) args.parent_folder_id = parent;
+        const result = await mcpCall('tools/call', { name: 'upload_file', arguments: args });
+        const text = result?.content?.[0]?.text;
+        const data = text ? JSON.parse(text) : result;
+        showResult('upload-result', data, !data?.success);
+      } catch (e) {
+        showResult('upload-result', e.message, true);
+      }
+    }
+
+    async function callGetMetadata() {
+      try {
+        const args = {
+          file_id: document.getElementById('meta-file-id').value?.trim(),
+          ...getCredentials('meta-path', 'meta-json'),
+        };
+        const result = await mcpCall('tools/call', { name: 'get_file_metadata', arguments: args });
+        const content = result?.content?.[0]?.text;
+        const data = content ? JSON.parse(content) : result;
+        showResult('meta-result', data, !data?.success);
+      } catch (e) {
+        showResult('meta-result', e.message, true);
+      }
+    }
+
+    async function callDownloadFile() {
+      try {
+        const args = {
+          file_id: document.getElementById('download-file-id').value?.trim(),
+          as_text: document.getElementById('download-as-text').value === 'true',
+          ...getCredentials('download-path', 'download-json'),
+        };
+        const result = await mcpCall('tools/call', { name: 'download_file', arguments: args });
+        const content = result?.content?.[0]?.text;
+        const data = content ? JSON.parse(content) : result;
+        showResult('download-result', data, !data?.success);
+      } catch (e) {
+        showResult('download-result', e.message, true);
+      }
+    }
+
+    async function callMoveFile() {
+      try {
+        const args = {
+          file_id: document.getElementById('move-file-id').value?.trim(),
+          new_parent_folder_id: document.getElementById('move-parent-id').value?.trim(),
+          ...getCredentials('move-path', 'move-json'),
+        };
+        const result = await mcpCall('tools/call', { name: 'move_file', arguments: args });
+        const content = result?.content?.[0]?.text;
+        const data = content ? JSON.parse(content) : result;
+        showResult('move-result', data, !data?.success);
+      } catch (e) {
+        showResult('move-result', e.message, true);
+      }
+    }
+
+    async function callDeleteFile() {
+      try {
+        const args = {
+          file_id: document.getElementById('delete-file-id').value?.trim(),
+          ...getCredentials('delete-path', 'delete-json'),
+        };
+        const result = await mcpCall('tools/call', { name: 'delete_file', arguments: args });
+        const content = result?.content?.[0]?.text;
+        const data = content ? JSON.parse(content) : result;
+        showResult('delete-result', data, !data?.success);
+      } catch (e) {
+        showResult('delete-result', e.message, true);
+      }
+    }
+
+    async function handleOAuthReturn() {
+      const params = new URLSearchParams(location.search);
+      const oauthState = params.get('oauth');
+      const oauthError = params.get('oauth_error');
+      if (oauthError) {
+        document.getElementById('oauth-status').style.display = 'block';
+        document.getElementById('oauth-status').className = 'result error';
+        document.getElementById('oauth-status').textContent = 'OAuth failed: ' + oauthError;
+        history.replaceState({}, '', '/test');
+        return;
+      }
+      if (oauthState) {
+        try {
+          const r = await fetch('/oauth/token?state=' + encodeURIComponent(oauthState));
+          const data = await r.json();
+          if (data.error) throw new Error(data.error);
+          const jsonStr = JSON.stringify(data, null, 2);
+          for (const id of CREDENTIAL_JSON_IDS) {
+            const el = document.getElementById(id);
+            if (el) el.value = jsonStr;
+          }
+          try { localStorage.setItem(OAUTH_STORAGE_KEY, jsonStr); } catch (_) {}
+          // Clear credentials_path so OAuth token from JSON is used
+          for (const id of PATH_IDS) {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+          }
+          document.getElementById('oauth-status').style.display = 'block';
+          document.getElementById('oauth-status').className = 'result success';
+          document.getElementById('oauth-status').textContent = 'Connected! OAuth token saved to all credential fields.';
+        } catch (e) {
+          document.getElementById('oauth-status').style.display = 'block';
+          document.getElementById('oauth-status').className = 'result error';
+          document.getElementById('oauth-status').textContent = 'OAuth failed: ' + e.message;
+        }
+        history.replaceState({}, '', '/test');
+      }
+    }
+
+    function restoreOAuthFromStorage() {
+      try {
+        const saved = localStorage.getItem(OAUTH_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.type === 'oauth' || parsed.refresh_token)) {
+            for (const id of CREDENTIAL_JSON_IDS) {
+              const el = document.getElementById(id);
+              if (el) el.value = saved;
+            }
+            for (const id of PATH_IDS) {
+              const el = document.getElementById(id);
+              if (el) el.value = '';
+            }
+            console.log('OAuth token restored from storage (Personal Drive)');
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Check server status on load; init session on first tool call; handle OAuth return
+    (async function init() {
+      const params = new URLSearchParams(location.search);
+      await handleOAuthReturn();
+      if (!params.get('oauth')) restoreOAuthFromStorage();
+    })();
+    fetch('/health').then(r => r.json()).then(d => {
+      document.getElementById('status').textContent = 'Server: ' + (d.status || 'ok') + ' | Session: will init on first tool call';
+    }).catch(() => {
+      document.getElementById('status').textContent = 'Server: unreachable';
+    });
+  </script>
+</body>
+</html>
