@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Test script for Google Drive MCP Server tools.
+Test script for Google Drive / Workspace MCP Server tools.
 
-Tests all 7 MCP tools: upload_file, download_file, list_files, create_folder,
-move_file, delete_file, get_file_metadata.
+Validates Drive tools plus Docs/Sheets/Slides/Forms/draw.io tool registration.
 
 Usage:
     # Test without credentials (validates tool structure, expects CREDENTIALS_REQUIRED):
@@ -45,6 +44,54 @@ except ImportError:
 
 # Default MCP server URL (trailing slash required by FastMCP)
 DEFAULT_URL = "http://localhost:8000/mcp/"
+
+EXPECTED_TOOLS = {
+    # Drive
+    "upload_file",
+    "download_file",
+    "list_files",
+    "create_folder",
+    "move_file",
+    "delete_file",
+    "get_file_metadata",
+    # Docs
+    "create_document",
+    "read_document",
+    "append_document_text",
+    "replace_document_text",
+    "insert_document_text",
+    "export_document",
+    # Sheets
+    "create_spreadsheet",
+    "list_sheet_tabs",
+    "read_sheet_range",
+    "update_sheet_range",
+    "append_sheet_rows",
+    "clear_sheet_range",
+    "add_sheet_tab",
+    "export_spreadsheet",
+    # Slides
+    "create_presentation",
+    "list_slides",
+    "read_presentation",
+    "add_slide",
+    "insert_slide_text",
+    "replace_presentation_text",
+    "export_presentation",
+    # Forms
+    "create_form",
+    "get_form",
+    "update_form_info",
+    "add_form_question",
+    "list_form_responses",
+    "get_form_response",
+    # draw.io
+    "create_diagram",
+    "list_diagrams",
+    "read_diagram",
+    "update_diagram",
+    "export_diagram",
+}
 
 # Test parameters
 TEST_FOLDER_NAME = "mcp-test-folder"
@@ -140,16 +187,12 @@ def run_tests_http(
     # 1. List tools (FastMCP may handle init automatically via session)
     try:
         tool_names = _list_tools_http(url)
-        expected = {
-            "upload_file", "download_file", "list_files", "create_folder",
-            "move_file", "delete_file", "get_file_metadata",
-        }
-        missing = expected - set(tool_names)
+        missing = EXPECTED_TOOLS - set(tool_names)
         if missing:
             print(f"FAIL: Missing tools: {missing}")
             failed += 1
         else:
-            print(f"PASS: All 7 tools registered: {sorted(tool_names)}")
+            print(f"PASS: All {len(EXPECTED_TOOLS)} tools registered ({len(tool_names)} total)")
             passed += 1
     except Exception as e:
         print(f"FAIL: list_tools: {e}")
@@ -269,7 +312,7 @@ def run_tests_http(
 
         # delete_file
         print("\n--- Test: delete_file ---")
-        data = _call_tool_http(url, "delete_file", {"file_id": file_id, **creds})
+        data = _call_tool_http(url, "delete_file", {"file_id": file_id, "confirm": True, **creds})
         if data.get("success"):
             print("PASS: delete_file")
             passed += 1
@@ -280,7 +323,7 @@ def run_tests_http(
         # Cleanup folders
         for fid in [folder_id, dest_folder_id]:
             if fid:
-                _call_tool_http(url, "delete_file", {"file_id": fid, **creds})
+                _call_tool_http(url, "delete_file", {"file_id": fid, "confirm": True, **creds})
 
     except Exception as e:
         print(f"FAIL: {e}")
@@ -305,16 +348,12 @@ async def run_tests_fastmcp(
         try:
             tools = await client.list_tools()
             tool_names = [t.name for t in tools]
-            expected = {
-                "upload_file", "download_file", "list_files", "create_folder",
-                "move_file", "delete_file", "get_file_metadata",
-            }
-            missing = expected - set(tool_names)
+            missing = EXPECTED_TOOLS - set(tool_names)
             if missing:
                 print(f"FAIL: Missing tools: {missing}")
                 failed += 1
             else:
-                print(f"PASS: All 7 tools registered: {sorted(tool_names)}")
+                print(f"PASS: All {len(EXPECTED_TOOLS)} tools registered ({len(tool_names)} total)")
                 passed += 1
         except Exception as e:
             print(f"FAIL: list_tools: {e}")
@@ -436,7 +475,7 @@ async def run_tests_fastmcp(
                 print("\n--- Test: move_file ---\nFAIL: Could not create dest folder")
                 failed += 1
 
-            result = await client.call_tool("delete_file", {"file_id": file_id, **creds}, raise_on_error=False)
+            result = await client.call_tool("delete_file", {"file_id": file_id, "confirm": True, **creds}, raise_on_error=False)
             data = result.data if hasattr(result, "data") else result
             success, data_dict = _tool_result(data)
             if success:
@@ -448,7 +487,7 @@ async def run_tests_fastmcp(
 
             for fid in [folder_id, dest_folder_id]:
                 if fid:
-                    await client.call_tool("delete_file", {"file_id": fid, **creds}, raise_on_error=False)
+                    await client.call_tool("delete_file", {"file_id": fid, "confirm": True, **creds}, raise_on_error=False)
         except Exception as e:
             print(f"FAIL: {e}")
             failed += 1

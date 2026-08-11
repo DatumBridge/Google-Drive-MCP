@@ -1,7 +1,7 @@
 """
-Error handling for Google Drive MCP Server.
+Error handling for Google Workspace MCP Server.
 
-Normalizes Google API errors into MCP-compatible format per design spec:
+Normalizes Google API errors into MCP-compatible format:
 - error_code
 - error_message
 - retryable (true/false)
@@ -11,13 +11,13 @@ Normalizes Google API errors into MCP-compatible format per design spec:
 from typing import Optional, Any
 
 
-class DriveError(Exception):
-    """Base error for Google Drive operations."""
+class GoogleWorkspaceError(Exception):
+    """Base error for Google Workspace / Drive operations."""
 
     def __init__(
         self,
         message: str,
-        error_code: str = "DRIVE_ERROR",
+        error_code: str = "WORKSPACE_ERROR",
         retryable: bool = False,
         original_error: Optional[Any] = None,
     ):
@@ -37,7 +37,11 @@ class DriveError(Exception):
         }
 
 
-class DriveAuthError(DriveError):
+# Backward-compatible alias for existing Drive tooling
+DriveError = GoogleWorkspaceError
+
+
+class DriveAuthError(GoogleWorkspaceError):
     """Authentication/authorization failure (401)."""
 
     def __init__(self, message: str = "Token expired or invalid", original_error: Optional[Any] = None):
@@ -49,7 +53,7 @@ class DriveAuthError(DriveError):
         )
 
 
-class DriveNotFoundError(DriveError):
+class DriveNotFoundError(GoogleWorkspaceError):
     """Resource not found (404)."""
 
     def __init__(self, message: str = "Resource not found", original_error: Optional[Any] = None):
@@ -61,7 +65,7 @@ class DriveNotFoundError(DriveError):
         )
 
 
-class DrivePermissionError(DriveError):
+class DrivePermissionError(GoogleWorkspaceError):
     """Permission denied (403)."""
 
     def __init__(self, message: str = "Permission denied", original_error: Optional[Any] = None):
@@ -73,7 +77,7 @@ class DrivePermissionError(DriveError):
         )
 
 
-class DriveRateLimitError(DriveError):
+class DriveRateLimitError(GoogleWorkspaceError):
     """Rate limit exceeded (429)."""
 
     def __init__(self, message: str = "Rate limit exceeded", original_error: Optional[Any] = None):
@@ -85,12 +89,39 @@ class DriveRateLimitError(DriveError):
         )
 
 
-def normalize_google_error(exc: Exception) -> DriveError:
+def normalize_google_error(exc: Exception) -> GoogleWorkspaceError:
     """
-    Map Google API HTTP errors to standardized DriveError subclasses.
+    Map Google API HTTP errors to standardized GoogleWorkspaceError subclasses.
+    Prefer HttpError.resp.status when available; fall back to message parsing.
     """
+    status = None
+    resp = getattr(exc, "resp", None)
+    if resp is not None:
+        status = getattr(resp, "status", None)
+        if status is not None:
+            try:
+                status = int(status)
+            except (TypeError, ValueError):
+                status = None
+
+    if status == 401:
+        return DriveAuthError(message="Token expired or invalid", original_error=exc)
+    if status == 403:
+        return DrivePermissionError(message="Permission denied", original_error=exc)
+    if status == 404:
+        return DriveNotFoundError(message="Resource not found", original_error=exc)
+    if status == 429:
+        return DriveRateLimitError(message="Rate limit exceeded", original_error=exc)
+    if status in (500, 502, 503):
+        return GoogleWorkspaceError(
+            message="Google API server error",
+            error_code="PROVIDER_ERROR",
+            retryable=True,
+            original_error=exc,
+        )
+
     error_str = str(exc).lower()
-    if "401" in error_str or "invalid" in error_str and "token" in error_str:
+    if "401" in error_str or ("invalid" in error_str and "token" in error_str):
         return DriveAuthError(message="Token expired or invalid", original_error=exc)
     if "403" in error_str or "permission" in error_str or "forbidden" in error_str:
         return DrivePermissionError(message="Permission denied", original_error=exc)
@@ -99,13 +130,13 @@ def normalize_google_error(exc: Exception) -> DriveError:
     if "429" in error_str or "rate" in error_str or "quota" in error_str:
         return DriveRateLimitError(message="Rate limit exceeded", original_error=exc)
     if "500" in error_str or "502" in error_str or "503" in error_str:
-        return DriveError(
+        return GoogleWorkspaceError(
             message="Google API server error",
             error_code="PROVIDER_ERROR",
             retryable=True,
             original_error=exc,
         )
-    return DriveError(
+    return GoogleWorkspaceError(
         message=str(exc),
         error_code="UNKNOWN_ERROR",
         retryable=False,

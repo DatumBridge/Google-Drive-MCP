@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 """
-OAuth 2.0 connection script for personal Google Drive.
+OAuth 2.0 connection script for personal Google Drive / Workspace.
 
-Run this once to authorize the MCP tools to access your personal Google Drive.
-Opens a browser for you to sign in with your Google account.
+Run this once to authorize the MCP tools to access your personal Google Drive,
+Docs, Sheets, Slides, and Forms. Opens a browser for you to sign in.
 
 Usage:
     1. In Google Cloud Console: APIs & Services → Credentials
        Create OAuth 2.0 Client ID (Desktop app or Web application)
        Download the JSON and save as credentials.json
 
-    2. Run this script:
+    2. Enable APIs: Drive, Docs, Sheets, Slides, Forms
+
+    3. Run this script:
        python scripts/oauth_connect.py
 
-    3. Sign in with your Google account in the browser
+    4. Sign in with your Google account in the browser
 
-    4. The script saves token.json - use this with MCP tools:
+    5. The script saves token.json - use this with MCP tools:
        - credentials_path: path to token.json
        - Or paste contents of token.json as credentials_json
+
+Note: If you previously connected with drive-only scopes, re-run this script
+to re-consent for Docs/Sheets/Slides/Forms.
 """
 
 import json
@@ -29,12 +34,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 try:
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
 except ImportError:
     print("Error: pip install google-auth-oauthlib")
     sys.exit(1)
 
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+from app.auth.scopes import SCOPES
+
 CREDENTIALS_FILE = Path(__file__).parent.parent / "credentials.json"
 TOKEN_FILE = Path(__file__).parent.parent / "token.json"
 

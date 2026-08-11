@@ -1,8 +1,10 @@
-# Google Drive MCP Server
+# Google Drive / Workspace MCP Server
 
-MCP Server for Google Drive integration with the DatumBridge platform. Exposes Drive capabilities as standardized MCP tools. Uses OAuth 2.0 for Personal Google Drive.
+MCP Server for Google Drive and Workspace content (Docs, Sheets, Slides, Forms, draw.io) for the DatumBridge platform. Uses OAuth 2.0 for Personal Google Drive.
 
 ## Tools
+
+### Drive (7)
 
 | Tool | Description |
 |------|-------------|
@@ -11,8 +13,65 @@ MCP Server for Google Drive integration with the DatumBridge platform. Exposes D
 | `list_files` | List files and folders in a folder or root |
 | `create_folder` | Create a new folder |
 | `move_file` | Move a file to a different parent folder |
-| `delete_file` | Permanently delete a file or folder |
+| `delete_file` | Permanently delete a file or folder (**requires `confirm=true`**) |
 | `get_file_metadata` | Get metadata for a file (name, size, mimeType, etc.) |
+
+### Google Docs (6)
+
+| Tool | Description |
+|------|-------------|
+| `create_document` | Create a Doc (optional parent folder) |
+| `read_document` | Read Doc as plain text |
+| `append_document_text` | Append text at end |
+| `replace_document_text` | Find/replace all |
+| `insert_document_text` | Insert at index (or append) |
+| `export_document` | Export as text/PDF/DOCX |
+
+### Google Sheets (8)
+
+| Tool | Description |
+|------|-------------|
+| `create_spreadsheet` | Create a spreadsheet |
+| `list_sheet_tabs` | List tabs |
+| `read_sheet_range` | Read A1 range |
+| `update_sheet_range` | Write/overwrite range |
+| `append_sheet_rows` | Append rows |
+| `clear_sheet_range` | Clear range |
+| `add_sheet_tab` | Add a tab |
+| `export_spreadsheet` | Export csv/xlsx/pdf |
+
+### Google Slides (7)
+
+| Tool | Description |
+|------|-------------|
+| `create_presentation` | Create a presentation |
+| `list_slides` | List slide object IDs |
+| `read_presentation` | Extract text per slide |
+| `add_slide` | Add a slide |
+| `insert_slide_text` | Insert text / create text box |
+| `replace_presentation_text` | Deck-wide find/replace |
+| `export_presentation` | Export pdf/pptx |
+
+### Google Forms (6)
+
+| Tool | Description |
+|------|-------------|
+| `create_form` | Create a form |
+| `get_form` | Read form structure |
+| `update_form_info` | Update title/description |
+| `add_form_question` | Add short/paragraph/MC/checkbox question |
+| `list_form_responses` | List responses (read-only; answers opt-in via `include_answers`) |
+| `get_form_response` | Get one response (answers opt-in) |
+
+### draw.io (5)
+
+| Tool | Description |
+|------|-------------|
+| `create_diagram` | Create `.drawio` mxfile in Drive |
+| `list_diagrams` | List diagram files |
+| `read_diagram` | Download diagram XML |
+| `update_diagram` | Overwrite diagram content |
+| `export_diagram` | Return XML (no server-side PNG/PDF render) |
 
 All files are created in your **Personal Google Drive** (drive.google.com).
 
@@ -21,7 +80,7 @@ All files are created in your **Personal Google Drive** (drive.google.com).
 ### 1. Google Cloud Setup
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
-2. Enable the **Google Drive API**
+2. Enable APIs: **Drive**, **Docs**, **Sheets**, **Slides**, **Forms**
 3. Create **OAuth 2.0 Client ID** (Web application) for the test UI, or Desktop app for the CLI script
 
 ### 2. Credentials (Input Parameters)
@@ -30,6 +89,8 @@ Credentials are passed as input parameters when invoking each tool:
 
 - **credentials_path**: Path to OAuth token JSON file (e.g. `token.json` from `oauth_connect.py`)
 - **credentials_json**: OAuth token JSON as string
+
+**Breaking change:** existing drive-only tokens must **re-consent** (Connect with Google again or re-run `oauth_connect.py`) to obtain Docs/Sheets/Slides/Forms scopes.
 
 ### 3. Install Dependencies
 
@@ -66,10 +127,15 @@ docker run -p 8000:8000 google-drive-mcp
 
 ## Architecture
 
-- **app/mcp_server.py** – MCP server with FastMCP, tool definitions
-- **app/services/drive_service.py** – Google Drive API wrapper (OAuth only)
-- **app/schemas/mcp_models.py** – Pydantic models for inputs/outputs (DatumBridge ADK uses for Test UI)
+- **app/mcp_server.py** – FastMCP assembly + HTTP mounts
+- **app/auth/** – Shared OAuth scopes, credential loader, API client factory
+- **app/tools/** – MCP tool registrations by product
+- **app/services/** – Drive/Docs/Sheets/Slides/Forms/Diagram API wrappers
+- **app/schemas/** – Pydantic models (DatumBridge ADK uses for Test UI)
 - **app/core/exceptions.py** – Normalized error handling
+- **docs/** – Architecture, business rules, API spec, ADRs, changelog
+
+See [docs/README.md](docs/README.md) for the full documentation index.
 
 ## OAuth: Connect Your Personal Google Drive
 
@@ -94,26 +160,17 @@ Files you create will appear in **your personal Google Drive** (drive.google.com
 
 ## Testing
 
-Run the test script to verify all 7 MCP tools:
-
 ```bash
-# 1. Start server
-docker run -d -p 8000:8000 --name google-drive-mcp google-drive-mcp
-
-# 2. Run tests (structure validation without credentials)
+# Structure validation without credentials
 ./scripts/run_tests.sh
 
-# 3. Full integration (with OAuth token)
+# Full integration (with OAuth token after re-consent)
 ./scripts/run_tests.sh --credentials-path token.json
 ```
 
 ## Manual Test UI
 
 ```bash
-# Start server
-docker run -d -p 8000:8000 --name google-drive-mcp google-drive-mcp
-
-# Open in browser
 open http://localhost:8000/test
 ```
 

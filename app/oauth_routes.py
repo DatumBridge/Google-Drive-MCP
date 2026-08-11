@@ -14,10 +14,10 @@ from urllib.parse import urlencode
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, JSONResponse
 
+from app.auth.scopes import SCOPES
+
 # In-memory store for OAuth state -> token (one-time use)
 _oauth_tokens: dict[str, dict] = {}
-
-SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 
 def _get_oauth_config() -> tuple[str, str]:

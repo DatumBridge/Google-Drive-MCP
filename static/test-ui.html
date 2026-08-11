@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Google Drive MCP - Test UI</title>
+  <title>Google Workspace MCP - Test UI</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -62,8 +62,8 @@
   </style>
 </head>
 <body>
-  <h1>Google Drive MCP Test UI</h1>
-  <p class="subtitle">Manually test all 7 MCP tools</p>
+  <h1>Google Workspace MCP Test UI</h1>
+  <p class="subtitle">Manually test Drive + Docs/Sheets/Slides/Forms/draw.io MCP tools (39 tools)</p>
 
   <div class="section" style="border: 2px solid #00d9ff;">
     <h2>Connect with Google (OAuth – Personal Drive)</h2>
@@ -456,6 +456,7 @@
       try {
         const args = {
           file_id: document.getElementById('delete-file-id').value?.trim(),
+          confirm: true,
           ...getCredentials('delete-path', 'delete-json'),
         };
         const result = await mcpCall('tools/call', { name: 'delete_file', arguments: args });
