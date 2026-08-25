@@ -15,6 +15,9 @@ It is a tool server, not a token vault / multi-tenant relay. Callers pass OAuth 
 | Layout | Tools/services/schemas split by domain; `mcp_server.py` is assembly-only |
 | MCP name | Remains `google-drive` for registry compatibility |
 | Create-with-parent | Soft-fail: create success + move failure ⇒ `success=true`, resource id kept, `parent_applied=false`, `parent_error` set; agents recover via `move_file` (ADR-0004) |
+| 403 `SERVICE_DISABLED` | `API_NOT_ENABLED` — enable Sheets/Docs/… API on the OAuth GCP project (not PERMISSION_DENIED / reconnect) |
+| Access token expiry | `get_credentials` refreshes when `expiry` is missing or expired; failed refresh → `AUTH_ERROR` (reconnect Integrations) |
+| Drive `q` 400 Invalid Value | `INVALID_QUERY` (not AUTH_ERROR); free text wrapped as `name contains` |
 
 ## Impacted components
 

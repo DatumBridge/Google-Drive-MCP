@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-25
+
+### Fixed
+
+- **Drive 400 Invalid Value on `q` was reported as `AUTH_ERROR`.** Catalog `list_files` sent purchase-request text (`mua phần mềm CRM zoho`) as Drive `q`. The error URL contains `pageToken`, so `"invalid" and "token"` mapped to “Token expired or invalid”. 400 invalid `q` is now `INVALID_QUERY` and includes the original Google message. Free text is wrapped as `name contains '...'`. LangGraph does not auto-fill unbound `list_files` query from catalog start-form text. Redeploy `google-drive-mcp` and `datumbridge-langgraph`.
+- **Google Drive `list_files` AUTH_ERROR “Token expired or invalid”.** Vault inject had `refresh_token` but no `expiry`, so google-auth sent the stale access token and Google returned 401 without refresh. MCP now refreshes before Drive calls; Integrations stores `expiry` on Connect. If refresh still fails, Disconnect then Connect Google Drive. Redeploy `google-drive-mcp` and `datumbridge-integrations`.
+- **403 `SERVICE_DISABLED` was reported as `PERMISSION_DENIED`.** Google Sheets/Docs/Slides/Forms 403 with `has not been used in project` / `SERVICE_DISABLED` now returns `API_NOT_ENABLED` with the Console activation URL. Enable the product API on the OAuth client project, wait a few minutes, retry. Not a Drive ACL and not an Integrations reconnect. Redeploy `google-drive-mcp`.
+- **Sheets API 400 “must not be an Office file”.** Uploaded `.xlsx` Drive files are not native Google Sheets. `read_sheet_range` now checks Drive mime first and returns `OFFICE_FILE_NOT_SUPPORTED`. Convert in Drive (Open with → Google Sheets) and use the new file id. Redeploy `google-drive-mcp`.
+- **Deleted Drive files still used by catalog `spreadsheet_id`.** `files.get` returns Trash by id. `list_files` adds `trashed = false`. Trashed sheet ids return `FILE_IN_TRASH`. Redeploy `google-drive-mcp`.
+
 ## 2026-08-11
 
 ### Added

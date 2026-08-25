@@ -17,6 +17,7 @@ class FileMetadata(BaseModel):
     parents: List[str] = Field(default_factory=list, description="Parent folder IDs")
     web_view_link: Optional[str] = Field(default=None, description="URL to view file in browser")
     is_folder: bool = Field(default=False, description="True if this is a folder")
+    trashed: bool = Field(default=False, description="True if the file is in Drive Trash")
 
 
 class FileListResponse(BaseModel):

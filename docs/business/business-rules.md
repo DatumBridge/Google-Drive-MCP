@@ -7,5 +7,7 @@
 5. Form response tools are read-only; `include_answers` defaults to `false` (opt-in for PII-bearing answers).
 6. Prefer semantic Docs/Slides helpers (`append_*`, `replace_*`) over raw index math.
 7. Exports above size limits fail with `PAYLOAD_TOO_LARGE`.
-8. Rate limits (`429`) are marked `retryable=true`.
-9. `delete_file` requires `confirm=true` or returns `CONFIRMATION_REQUIRED`.
+8. Rate limits (`429`) are marked `retryable=true`. Product APIs that are not enabled on the OAuth GCP project (`SERVICE_DISABLED`) return `API_NOT_ENABLED` (`retryable=true` after the operator enables the API). That is not a Drive sharing ACL and not `CREDENTIALS_REQUIRED`.
+9. `read_sheet_range` and other Sheets API tools require a **native Google Sheet** (`application/vnd.google-apps.spreadsheet`). An uploaded Excel `.xlsx` in Drive returns `OFFICE_FILE_NOT_SUPPORTED`. Convert in Drive (Open with → Google Sheets) once; do not pass the `.xlsx` file id.
+10. `delete_file` requires `confirm=true` or returns `CONFIRMATION_REQUIRED`.
+13. Drive `list_files` `query` must be Drive search syntax (or free text, which is wrapped as `name contains '...'`). A Google 400 Invalid Value on `q` is `INVALID_QUERY`, never `AUTH_ERROR` (do not match `pageToken` in the URL as an OAuth token).

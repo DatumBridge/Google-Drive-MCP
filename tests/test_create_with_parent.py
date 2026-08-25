@@ -203,6 +203,151 @@ def test_normalize_google_error_uses_status_code():
     assert err.error_code == "PERMISSION_DENIED"
 
 
+def test_normalize_google_error_sheets_api_not_enabled():
+    class Resp:
+        status = 403
+
+    class FakeHttpError(Exception):
+        def __init__(self):
+            self.resp = Resp()
+            super().__init__(
+                'HttpError 403 when requesting https://sheets.googleapis.com/v4/spreadsheets/abc/values/A1 '
+                'returned "Google Sheets API has not been used in project 000000000001 before or it is disabled. '
+                "Enable it by visiting https://console.developers.google.com/apis/api/sheets.googleapis.com/"
+                'overview?project=000000000001 then retry.". Details: "[{reason: SERVICE_DISABLED}]"'
+            )
+
+    err = normalize_google_error(FakeHttpError())
+    assert err.error_code == "API_NOT_ENABLED"
+    assert err.retryable is True
+    assert "Google Sheets API" in err.message
+    assert "sheets.googleapis.com" in err.message
+    assert "not a Drive sharing ACL" in err.message
+
+
+def test_normalize_google_error_office_xlsx_not_supported():
+    class Resp:
+        status = 400
+
+    class FakeHttpError(Exception):
+        def __init__(self):
+            self.resp = Resp()
+            super().__init__(
+                'HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/abc/values/A1 '
+                'returned "This operation is not supported for this document. '
+                'The document must not be an Office file."'
+            )
+
+    err = normalize_google_error(FakeHttpError())
+    assert err.error_code == "OFFICE_FILE_NOT_SUPPORTED"
+    assert err.retryable is False
+    assert "Google Sheet" in err.message
+
+
+def test_normalize_google_error_invalid_q_is_not_auth_error():
+    class Resp:
+        status = 400
+
+    class FakeHttpError(Exception):
+        def __init__(self):
+            self.resp = Resp()
+            super().__init__(
+                "<HttpError 400 when requesting "
+                "https://www.googleapis.com/drive/v3/files?q=%27root%27+in+parents+"
+                "and+mua+ph%E1%BA%A7n+m%E1%BB%81m+CRM+zoho&pageSize=10&pageToken=&"
+                "fields=nextPageToken%2C+files%28id%2C+name%29&alt=json returned "
+                "\"Invalid Value\". Details: \"[{'message': 'Invalid Value', "
+                "'domain': 'global', 'reason': 'invalid', 'location': 'q', "
+                "'locationType': 'parameter'}]\">"
+            )
+
+    err = normalize_google_error(FakeHttpError())
+    assert err.error_code == "INVALID_QUERY"
+    assert "Invalid Value" in err.message
+    assert "name contains" in err.message
+
+
+def test_coerce_drive_list_query_wraps_natural_language():
+    from app.services.drive_service import coerce_drive_list_query
+
+    assert coerce_drive_list_query("mua phần mềm CRM zoho") == (
+        "name contains 'mua phần mềm CRM zoho'"
+    )
+    assert (
+        coerce_drive_list_query("mimeType='application/vnd.google-apps.spreadsheet'")
+        == "mimeType='application/vnd.google-apps.spreadsheet'"
+    )
+    assert coerce_drive_list_query("name contains 'budget'") == "name contains 'budget'"
+
+
+def test_read_range_rejects_xlsx_office_file():
+    from app.schemas.drive import FileMetadata
+
+    svc = SheetsService.__new__(SheetsService)
+    svc._sheets = MagicMock()
+    svc._drive = MagicMock()
+    svc._drive.get_metadata.return_value = FileMetadata(
+        id="xlsx-1",
+        name="budget_2026.xlsx",
+        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    try:
+        svc.read_range("xlsx-1", "Budget_2026!A1:Z200")
+        raise AssertionError("expected OFFICE_FILE_NOT_SUPPORTED")
+    except GoogleWorkspaceError as err:
+        assert err.error_code == "OFFICE_FILE_NOT_SUPPORTED"
+        assert "Excel" in err.message or "Office" in err.message
+    svc._sheets.spreadsheets().values().get.assert_not_called()
+
+
+def test_read_range_rejects_trashed_file():
+    from app.schemas.drive import FileMetadata
+
+    svc = SheetsService.__new__(SheetsService)
+    svc._sheets = MagicMock()
+    svc._drive = MagicMock()
+    svc._drive.get_metadata.return_value = FileMetadata(
+        id="xlsx-1",
+        name="budget_2026.xlsx",
+        mime_type="application/vnd.google-apps.spreadsheet",
+        trashed=True,
+    )
+    try:
+        svc.read_range("xlsx-1", "Budget_2026!A1:Z200")
+        raise AssertionError("expected FILE_IN_TRASH")
+    except GoogleWorkspaceError as err:
+        assert err.error_code == "FILE_IN_TRASH"
+    svc._sheets.spreadsheets().values().get.assert_not_called()
+
+
+def test_list_files_query_excludes_trash():
+    drive = DriveService.__new__(DriveService)
+    listed = MagicMock()
+    listed.execute.return_value = {"files": []}
+    files_api = MagicMock()
+    files_api.list.return_value = listed
+    drive._service = MagicMock()
+    drive._service.files.return_value = files_api
+    drive.list_files(folder_id=None, query="name contains 'budget'")
+    kwargs = files_api.list.call_args.kwargs
+    assert "trashed = false" in (kwargs.get("q") or "")
+    assert "name contains 'budget'" in (kwargs.get("q") or "")
+
+
+def test_list_files_wraps_natural_language_query():
+    drive = DriveService.__new__(DriveService)
+    listed = MagicMock()
+    listed.execute.return_value = {"files": []}
+    files_api = MagicMock()
+    files_api.list.return_value = listed
+    drive._service = MagicMock()
+    drive._service.files.return_value = files_api
+    drive.list_files(folder_id=None, query="mua phần mềm CRM zoho")
+    q = files_api.list.call_args.kwargs.get("q") or ""
+    assert "name contains 'mua phần mềm CRM zoho'" in q
+    assert "trashed = false" in q
+
+
 def test_all_expected_tools_registered():
     mcp = FastMCP("google-drive")
     register_all(mcp)

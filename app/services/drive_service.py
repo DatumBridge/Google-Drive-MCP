@@ -20,6 +20,34 @@ from app.schemas.drive import FileMetadata
 # Re-export for scripts that historically imported SCOPES from here
 from app.auth.scopes import SCOPES  # noqa: F401
 
+_DRIVE_QUERY_MARKERS = (
+    "contains",
+    "mimetype",
+    "in parents",
+    "trashed",
+    "fulltext",
+    "modifiedtime",
+    "createdtime",
+    "starred",
+    "sharedwithme",
+    "name =",
+    "name=",
+)
+
+
+def coerce_drive_list_query(query: Optional[str]) -> Optional[str]:
+    """Turn free-text (e.g. a purchase request title) into Drive `q` syntax."""
+    if query is None:
+        return None
+    text = str(query).strip()
+    if not text:
+        return None
+    lower = text.lower()
+    if any(marker in lower for marker in _DRIVE_QUERY_MARKERS):
+        return text
+    escaped = text.replace("\\", "\\\\").replace("'", "\\'")
+    return f"name contains '{escaped}'"
+
 
 class DriveService:
     """
@@ -55,6 +83,7 @@ class DriveService:
             parents=f.get("parents", []) or [],
             web_view_link=f.get("webViewLink"),
             is_folder=mime == "application/vnd.google-apps.folder",
+            trashed=bool(f.get("trashed")),
         )
 
     def list_files(
@@ -76,8 +105,13 @@ class DriveService:
             elif include_root_parent:
                 q_parts.append("'root' in parents")
             if query:
-                q_parts.append(query)
-            q_str = " and ".join(q_parts) if q_parts else None
+                coerced = coerce_drive_list_query(query)
+                if coerced:
+                    q_parts.append(coerced)
+            # Drive files.get still returns Trash by id; list must not surface deleted workbooks.
+            if not query or "trashed" not in query.lower():
+                q_parts.append("trashed = false")
+            q_str = " and ".join(q_parts) if q_parts else "trashed = false"
 
             result = (
                 self.service.files()
@@ -85,7 +119,7 @@ class DriveService:
                     q=q_str,
                     pageSize=page_size,
                     pageToken=page_token or "",
-                    fields="nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink)",
+                    fields="nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink, trashed)",
                 )
                 .execute()
             )
@@ -288,7 +322,7 @@ class DriveService:
                 self.service.files()
                 .get(
                     fileId=file_id,
-                    fields="id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink",
+                    fields="id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink, trashed",
                 )
                 .execute()
             )

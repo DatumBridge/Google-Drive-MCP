@@ -166,7 +166,7 @@ def register(mcp) -> None:
         ),
         query: Optional[str] = Field(
             default=None,
-            description="Optional Drive query (e.g., mimeType='application/pdf')",
+            description="Optional Drive query (e.g. mimeType='application/vnd.google-apps.spreadsheet'). Free text is wrapped as name contains '...'.",
         ),
     ) -> FileListResponse:
         """

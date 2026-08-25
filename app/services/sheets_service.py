@@ -10,6 +10,34 @@ from app.auth.clients import build_sheets_service
 from app.core.exceptions import GoogleWorkspaceError, normalize_google_error
 from app.services.drive_service import DriveService
 
+NATIVE_GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
+OFFICE_SPREADSHEET_MIMES = frozenset(
+    {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+        "application/vnd.ms-excel.sheet.macroenabled.12",
+        "application/vnd.oasis.opendocument.spreadsheet",
+    }
+)
+OFFICE_FILE_NOT_SUPPORTED_MESSAGE = (
+    "This Drive file is a Microsoft Excel/Office workbook, not a native Google Sheet. "
+    "The Sheets API cannot read .xlsx/.xls/.ods file ids. In Google Drive, open the file "
+    "and choose Open with → Google Sheets (or File → Save as Google Sheets). Then bind "
+    "read_sheet_range.spreadsheet_id to the new Google Sheet id. Convert once; do not "
+    "reconnect Integrations."
+)
+
+
+def _is_office_spreadsheet_mime(mime: str, name: str = "") -> bool:
+    m = (mime or "").strip().lower()
+    if m in OFFICE_SPREADSHEET_MIMES:
+        return True
+    if "openxmlformats" in m and "sheet" in m:
+        return True
+    n = (name or "").strip().lower()
+    return n.endswith((".xlsx", ".xlsm", ".xls", ".ods"))
+
+
 EXPORT_MIME_MAP = {
     "csv": "text/csv",
     "text/csv": "text/csv",
@@ -68,7 +96,39 @@ class SheetsService:
             "parent_error": parent_error,
         }
 
+    def _ensure_native_google_sheet(self, spreadsheet_id: str) -> None:
+        """Sheets API only works on native Google Sheets, not uploaded Excel files."""
+        meta = self._drive.get_metadata(spreadsheet_id)
+        mime = (getattr(meta, "mime_type", None) or "").strip().lower()
+        name = getattr(meta, "name", None) or spreadsheet_id
+        if getattr(meta, "trashed", False):
+            raise GoogleWorkspaceError(
+                f"Drive file {name!r} is in Trash. Empty Trash or restore it, then bind "
+                "read_sheet_range.spreadsheet_id to a live native Google Sheet id "
+                "(not the deleted .xlsx). Catalog List Run uses the saved stage parameter, "
+                "not canvas label edits.",
+                error_code="FILE_IN_TRASH",
+                retryable=False,
+            )
+        if mime == NATIVE_GOOGLE_SHEET_MIME:
+            return
+        if _is_office_spreadsheet_mime(mime, str(name)):
+            raise GoogleWorkspaceError(
+                OFFICE_FILE_NOT_SUPPORTED_MESSAGE,
+                error_code="OFFICE_FILE_NOT_SUPPORTED",
+                retryable=False,
+            )
+        if mime:
+            raise GoogleWorkspaceError(
+                f"Drive file {name!r} is {mime}, not a native Google Sheet "
+                f"({NATIVE_GOOGLE_SHEET_MIME}). Convert it in Drive (Open with → "
+                "Google Sheets) and use that file id as spreadsheet_id.",
+                error_code="OFFICE_FILE_NOT_SUPPORTED",
+                retryable=False,
+            )
+
     def list_tabs(self, spreadsheet_id: str) -> List[dict]:
+        self._ensure_native_google_sheet(spreadsheet_id)
         try:
             spreadsheet = (
                 self._sheets.spreadsheets()
@@ -96,6 +156,7 @@ class SheetsService:
                 error_code="VALIDATION_ERROR",
                 retryable=False,
             )
+        self._ensure_native_google_sheet(spreadsheet_id)
         try:
             result = (
                 self._sheets.spreadsheets()
@@ -121,6 +182,7 @@ class SheetsService:
                 error_code="VALIDATION_ERROR",
                 retryable=False,
             )
+        self._ensure_native_google_sheet(spreadsheet_id)
         try:
             result = (
                 self._sheets.spreadsheets()
@@ -156,6 +218,7 @@ class SheetsService:
                 error_code="VALIDATION_ERROR",
                 retryable=False,
             )
+        self._ensure_native_google_sheet(spreadsheet_id)
         try:
             result = (
                 self._sheets.spreadsheets()
@@ -184,6 +247,7 @@ class SheetsService:
                 error_code="VALIDATION_ERROR",
                 retryable=False,
             )
+        self._ensure_native_google_sheet(spreadsheet_id)
         try:
             result = (
                 self._sheets.spreadsheets()
@@ -202,6 +266,7 @@ class SheetsService:
                 error_code="VALIDATION_ERROR",
                 retryable=False,
             )
+        self._ensure_native_google_sheet(spreadsheet_id)
         try:
             result = (
                 self._sheets.spreadsheets()

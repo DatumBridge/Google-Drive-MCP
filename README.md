@@ -80,7 +80,7 @@ All files are created in your **Personal Google Drive** (drive.google.com).
 ### 1. Google Cloud Setup
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
-2. Enable APIs: **Drive**, **Docs**, **Sheets**, **Slides**, **Forms**
+2. Enable APIs **on the OAuth client project**: **Drive**, **Docs**, **Sheets**, **Slides**, **Forms**. Drive-only enablement is enough for `list_files`; **Sheets** is required for `read_sheet_range`. A 403 `SERVICE_DISABLED` is `API_NOT_ENABLED`, not a file ACL. Uploaded `.xlsx` files must be converted to Google Sheets before `read_sheet_range`.
 3. Create **OAuth 2.0 Client ID** (Web application) for the test UI, or Desktop app for the CLI script
 
 ### 2. Credentials (Input Parameters)

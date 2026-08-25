@@ -43,8 +43,12 @@ draw.io `create_diagram` sets parents at Drive create time; `parent_applied` is 
 |------|---------|-----------|
 | `CREDENTIALS_REQUIRED` | Missing creds | no |
 | `INVALID_CREDENTIALS` | Non-OAuth payload | no |
-| `AUTH_ERROR` | 401 / expired token | yes |
+| `AUTH_ERROR` | 401 / expired or revoked token. google-drive-mcp refreshes when vault JSON has `refresh_token` + client id/secret (and when `expiry` is missing). If refresh fails (`invalid_grant`), reconnect Google Drive under Account → Integrations. A Drive `files.list` 400 Invalid Value on `q` is **not** this code. | yes (after refresh or reconnect) |
+| `INVALID_QUERY` | Drive `files.list` 400 Invalid Value on `q` (free-text / purchase-request title is not Drive search syntax) | no |
 | `PERMISSION_DENIED` | 403 / missing scopes | no |
+| `API_NOT_ENABLED` | 403 `SERVICE_DISABLED` — product API (Sheets, Docs, …) not enabled on the OAuth GCP project | yes (after operator enables the API) |
+| `OFFICE_FILE_NOT_SUPPORTED` | Drive file is Excel/Office (`.xlsx`), not a native Google Sheet | no |
+| `FILE_IN_TRASH` | `spreadsheet_id` still points at a file in Drive Trash | no |
 | `NOT_FOUND` | 404 | no |
 | `RATE_LIMIT` | 429 | yes |
 | `PROVIDER_ERROR` | 5xx | yes |

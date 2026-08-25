@@ -11,7 +11,7 @@
 
 1. Agent discovers file via `list_files` / `get_file_metadata` (or create_*)
 2. Calls product tool (`read_document`, `update_sheet_range`, …) with credentials
-3. On `AUTH_ERROR` / insufficient scopes → operator re-consents
+3. On `AUTH_ERROR` after refresh failure (`invalid_grant`) → operator reconnects Google Drive under Account → Integrations.
 4. On `RATE_LIMIT` → backoff and retry
 
 ## Create with parent (ADR-0004)

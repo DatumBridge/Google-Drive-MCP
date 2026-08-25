@@ -14,6 +14,7 @@
 | Least privilege (Forms responses) | `forms.responses.readonly` only |
 | Forms answers default off | `include_answers=false` unless explicitly opted in |
 | Deny without creds | `CREDENTIALS_REQUIRED` |
+| Refresh stale access tokens | Refresh when `expiry` missing/expired; never log tokens |
 | No secret logging | Tokens / response PII not logged |
 | Payload limits | Export ≤ 25MB; diagram ≤ 5MB; diagram XML to agents ≤ 200k chars; sheet cells ≤ 50k |
 | Permanent delete gate | `delete_file` requires `confirm=true` |
