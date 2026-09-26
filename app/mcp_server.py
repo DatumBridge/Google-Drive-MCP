@@ -19,6 +19,7 @@ from starlette.routing import Mount, Route
 
 from app.oauth_routes import oauth_callback, oauth_info, oauth_start, oauth_token
 from app.tools import register_all
+from app.capability_bind import bind_declared_capabilities
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,9 @@ mcp = FastMCP(
 register_all(mcp)
 
 # ============== HTTP App with Health Endpoint ==============
+
+
+bind_declared_capabilities(mcp)
 
 _base_app = mcp.http_app()
 
