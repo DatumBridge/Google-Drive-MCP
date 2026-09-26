@@ -34,6 +34,7 @@ class ReadSheetRangeResponse(BaseModel):
     success: bool
     spreadsheet_id: Optional[str] = None
     range: Optional[str] = None
+    resolved_range: Optional[str] = None
     values: List[List[Any]] = Field(default_factory=list)
     error: Optional[dict] = None
 

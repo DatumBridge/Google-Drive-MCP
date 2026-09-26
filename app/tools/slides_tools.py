@@ -36,7 +36,11 @@ def register(mcp) -> None:
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
         parent_folder_id: Optional[str] = Field(default=None, description="Optional Drive parent folder ID"),
     ) -> CreatePresentationResponse:
-        """Create a Google Slides presentation."""
+        """Create a Google Slides presentation.
+
+        Capabilities: drive.create_presentation
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return CreatePresentationResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -54,7 +58,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ListSlidesResponse:
-        """List slides in a presentation (object IDs + text hints)."""
+        """List slides in a presentation (object IDs + text hints).
+
+        Capabilities: drive.list_slides
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ListSlidesResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -74,7 +82,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ReadPresentationResponse:
-        """Extract text content per slide for agent-friendly reading."""
+        """Extract text content per slide for agent-friendly reading.
+
+        Capabilities: drive.read_presentation
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ReadPresentationResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -104,7 +116,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> AddSlideResponse:
-        """Add a slide to a presentation."""
+        """Add a slide to a presentation.
+
+        Capabilities: drive.add_slide
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return AddSlideResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -121,7 +137,7 @@ def register(mcp) -> None:
     @mcp.tool()
     def insert_slide_text(
         presentation_id: str = Field(..., description="Presentation ID"),
-        text: str = Field(..., description="Text to insert"),
+        text: str = Field(..., description="Text to insert", json_schema_extra={"x-datumbridge-encoding": "plain"}),
         slide_object_id: Optional[str] = Field(
             default=None, description="Target slide object ID (defaults to first slide)"
         ),
@@ -131,7 +147,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> InsertSlideTextResponse:
-        """Insert text into a shape, or create a text box on a slide."""
+        """Insert text into a shape, or create a text box on a slide.
+
+        Capabilities: drive.insert_slide_text
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return InsertSlideTextResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -151,13 +171,17 @@ def register(mcp) -> None:
     @mcp.tool()
     def replace_presentation_text(
         presentation_id: str = Field(..., description="Presentation ID"),
-        find_text: str = Field(..., description="Text to find"),
-        replace_text: str = Field(..., description="Replacement text"),
+        find_text: str = Field(..., description="Text to find", json_schema_extra={"x-datumbridge-encoding": "plain"}),
+        replace_text: str = Field(..., description="Replacement text", json_schema_extra={"x-datumbridge-encoding": "plain"}),
         match_case: bool = Field(default=True, description="Case-sensitive match"),
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ReplacePresentationTextResponse:
-        """Find and replace text across an entire presentation."""
+        """Find and replace text across an entire presentation.
+
+        Capabilities: drive.replace_presentation_text
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ReplacePresentationTextResponse(
@@ -183,7 +207,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ExportPresentationResponse:
-        """Export a presentation via Drive export (pdf/pptx)."""
+        """Export a presentation via Drive export (pdf/pptx).
+
+        Capabilities: drive.export_presentation
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ExportPresentationResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)

@@ -50,7 +50,11 @@ def register(mcp) -> None:
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
         parent_folder_id: Optional[str] = Field(default=None, description="Optional Drive parent folder ID"),
     ) -> CreateSpreadsheetResponse:
-        """Create a Google Spreadsheet. Optionally place it in a Drive folder."""
+        """Create a Google Spreadsheet. Optionally place it in a Drive folder.
+
+        Capabilities: drive.create_spreadsheet
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return CreateSpreadsheetResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -68,7 +72,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ListSheetTabsResponse:
-        """List sheet tabs (title + sheetId) in a spreadsheet."""
+        """List sheet tabs (title + sheetId) in a spreadsheet.
+
+        Capabilities: drive.list_sheet_tabs
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ListSheetTabsResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -89,17 +97,22 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ReadSheetRangeResponse:
-        """Read values from a spreadsheet range (A1 notation)."""
+        """Read values from a spreadsheet range (A1 notation).
+
+        Capabilities: drive.read_sheet_range
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ReadSheetRangeResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
-            values = get_sheets(credentials_path, credentials_json).read_range(
-                spreadsheet_id, range
-            )
+            values, resolved = get_sheets(
+                credentials_path, credentials_json
+            ).read_range_resolved(spreadsheet_id, range)
             return ReadSheetRangeResponse(
                 success=True,
                 spreadsheet_id=spreadsheet_id,
                 range=range,
+                resolved_range=resolved,
                 values=values,
             )
         except DriveError as e:
@@ -120,7 +133,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> UpdateSheetRangeResponse:
-        """Overwrite a spreadsheet range with values."""
+        """Overwrite a spreadsheet range with values.
+
+        Capabilities: drive.update_sheet_range
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return UpdateSheetRangeResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -160,7 +177,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> AppendSheetRowsResponse:
-        """Append rows to a spreadsheet sheet/table."""
+        """Append rows to a spreadsheet sheet/table.
+
+        Capabilities: drive.append_sheet_rows
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return AppendSheetRowsResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -190,7 +211,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ClearSheetRangeResponse:
-        """Clear values in a spreadsheet range."""
+        """Clear values in a spreadsheet range.
+
+        Capabilities: drive.clear_sheet_range
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ClearSheetRangeResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -211,7 +236,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> AddSheetTabResponse:
-        """Add a new tab to a spreadsheet."""
+        """Add a new tab to a spreadsheet.
+
+        Capabilities: drive.add_sheet_tab
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return AddSheetTabResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -233,7 +262,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ExportSpreadsheetResponse:
-        """Export a spreadsheet via Drive export (csv/xlsx/pdf)."""
+        """Export a spreadsheet via Drive export (csv/xlsx/pdf).
+
+        Capabilities: drive.export_spreadsheet
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ExportSpreadsheetResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)

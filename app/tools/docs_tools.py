@@ -33,7 +33,11 @@ def register(mcp) -> None:
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
         parent_folder_id: Optional[str] = Field(default=None, description="Optional Drive parent folder ID"),
     ) -> CreateDocumentResponse:
-        """Create a Google Doc. Optionally move it into a Drive folder (parent_applied reports success)."""
+        """Create a Google Doc. Optionally move it into a Drive folder (parent_applied reports success).
+
+        Capabilities: drive.create_document
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return CreateDocumentResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -51,7 +55,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ReadDocumentResponse:
-        """Read a Google Doc as plain text."""
+        """Read a Google Doc as plain text.
+
+        Capabilities: drive.read_document
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ReadDocumentResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -64,11 +72,19 @@ def register(mcp) -> None:
     @mcp.tool()
     def append_document_text(
         document_id: str = Field(..., description="Google Docs document ID"),
-        text: str = Field(..., description="Text to append at the end of the document"),
+        text: str = Field(
+            ...,
+            description="Text to append at the end of the document",
+            json_schema_extra={"x-datumbridge-encoding": "plain"},
+        ),
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> AppendDocumentTextResponse:
-        """Append text to the end of a Google Doc (hides raw index math)."""
+        """Append text to the end of a Google Doc (hides raw index math).
+
+        Capabilities: docs.append
+        Outputs: document_id, success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return AppendDocumentTextResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -83,13 +99,17 @@ def register(mcp) -> None:
     @mcp.tool()
     def replace_document_text(
         document_id: str = Field(..., description="Google Docs document ID"),
-        find_text: str = Field(..., description="Text to find"),
-        replace_text: str = Field(..., description="Replacement text"),
+        find_text: str = Field(..., description="Text to find", json_schema_extra={"x-datumbridge-encoding": "plain"}),
+        replace_text: str = Field(..., description="Replacement text", json_schema_extra={"x-datumbridge-encoding": "plain"}),
         match_case: bool = Field(default=True, description="Case-sensitive match"),
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ReplaceDocumentTextResponse:
-        """Find and replace all matching text in a Google Doc."""
+        """Find and replace all matching text in a Google Doc.
+
+        Capabilities: drive.replace_document_text
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ReplaceDocumentTextResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -109,7 +129,11 @@ def register(mcp) -> None:
     @mcp.tool()
     def insert_document_text(
         document_id: str = Field(..., description="Google Docs document ID"),
-        text: str = Field(..., description="Text to insert"),
+        text: str = Field(
+            ...,
+            description="Text to insert",
+            json_schema_extra={"x-datumbridge-encoding": "plain"},
+        ),
         index: Optional[int] = Field(
             default=None,
             description="Optional Docs body index (>=1). Omit to append at end.",
@@ -117,7 +141,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> InsertDocumentTextResponse:
-        """Insert text at an optional Docs index, or append when index is omitted."""
+        """Insert text at an optional Docs index, or append when index is omitted.
+
+        Capabilities: drive.insert_document_text
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return InsertDocumentTextResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -139,7 +167,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ExportDocumentResponse:
-        """Export a Google Doc via Drive export (plain text, PDF, or DOCX)."""
+        """Export a Google Doc via Drive export (plain text, PDF, or DOCX).
+
+        Capabilities: drive.export_document
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ExportDocumentResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)

@@ -17,4 +17,5 @@
 | [adr/ADR-0002-oauth-scope-expansion.md](adr/ADR-0002-oauth-scope-expansion.md) | Scopes |
 | [adr/ADR-0003-drawio-via-drive-mxfile.md](adr/ADR-0003-drawio-via-drive-mxfile.md) | draw.io strategy |
 | [adr/ADR-0004-create-with-parent.md](adr/ADR-0004-create-with-parent.md) | Parent folder contract |
+| [adr/ADR-0005-sheet-tab-range-resolve.md](adr/ADR-0005-sheet-tab-range-resolve.md) | Remap missing Sheet tab in A1 range |
 | [changelog/CHANGELOG.md](changelog/CHANGELOG.md) | History |

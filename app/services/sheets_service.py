@@ -2,12 +2,17 @@
 Google Sheets API wrapper.
 """
 
+import re
 from typing import Any, List, Optional, Tuple
 
 from googleapiclient.errors import HttpError
 
 from app.auth.clients import build_sheets_service
-from app.core.exceptions import GoogleWorkspaceError, normalize_google_error
+from app.core.exceptions import (
+    GoogleWorkspaceError,
+    is_unparseable_sheet_range_error,
+    normalize_google_error,
+)
 from app.services.drive_service import DriveService
 
 NATIVE_GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
@@ -51,6 +56,92 @@ EXPORT_MIME_MAP = {
 
 MAX_EXPORT_BYTES = 25 * 1024 * 1024
 MAX_CELLS = 50_000
+_A1_CELLS_RE = re.compile(r"^[A-Za-z]{1,3}\d+(?::[A-Za-z]{1,3}\d+)?$")
+_CONVERT_DEFAULT_TAB_RE = re.compile(
+    r"^(Sheet\d*|Trang tính\d*|Hoja\d*|Feuille\d*)$",
+    re.IGNORECASE,
+)
+_BUDGET_WORD_RE = re.compile(r"\bbudget\b", re.IGNORECASE)
+
+
+def looks_like_a1_cells(text: str) -> bool:
+    return bool(_A1_CELLS_RE.match((text or "").replace("$", "").strip()))
+
+
+def _has_budget_token(text: str) -> bool:
+    lowered = (text or "").lower().replace("_", " ")
+    if "ngân sách" in lowered or "ngan sach" in lowered:
+        return True
+    return bool(_BUDGET_WORD_RE.search(lowered))
+
+
+def split_a1_range(range_a1: str) -> Tuple[Optional[str], str]:
+    text = (range_a1 or "").strip()
+    if not text:
+        return None, ""
+    if text.startswith("'"):
+        marker = text.find("'!", 1)
+        if marker == -1:
+            return text.strip("'"), ""
+        title = text[1:marker].replace("''", "'")
+        return title, text[marker + 2 :].strip()
+    if "!" in text:
+        title, cells = text.split("!", 1)
+        return title.strip().strip("'"), cells.strip()
+    return None, text
+
+
+def quote_a1_range(sheet_title: str, cells: str) -> str:
+    escaped = (sheet_title or "").replace("'", "''")
+    bounds = (cells or "").strip()
+    if not bounds:
+        return f"'{escaped}'"
+    return f"'{escaped}'!{bounds}"
+
+
+def pick_sheet_title(requested: Optional[str], titles: List[str]) -> Optional[str]:
+    clean = [t for t in titles if isinstance(t, str) and t.strip()]
+    if not clean:
+        return None
+    if requested:
+        for title in clean:
+            if title == requested:
+                return title
+        lowered = requested.lower()
+        case_hits = [t for t in clean if t.lower() == lowered]
+        if len(case_hits) == 1:
+            return case_hits[0]
+        normalized = lowered.replace("_", " ")
+        space_hits = [t for t in clean if t.lower().replace("_", " ") == normalized]
+        if len(space_hits) == 1:
+            return space_hits[0]
+        if _has_budget_token(requested):
+            budget_hits = [t for t in clean if _has_budget_token(t)]
+            if len(budget_hits) == 1:
+                return budget_hits[0]
+    if len(clean) == 1 and _CONVERT_DEFAULT_TAB_RE.match(clean[0].strip()):
+        return clean[0]
+    return None
+
+
+def _invalid_range_error(
+    requested: str,
+    titles: List[str],
+    original: Optional[Exception] = None,
+) -> GoogleWorkspaceError:
+    tab_list = ", ".join(repr(t) for t in titles) if titles else "(none)"
+    original_text = str(original).strip().split("\n", 1)[0] if original else ""
+    suffix = f" Original: {original_text}" if original_text else ""
+    return GoogleWorkspaceError(
+        message=(
+            f"Unable to parse range {requested!r}. That tab is not on this Google Sheet. "
+            f"Tabs: {tab_list}. Bind range to an existing tab "
+            f"(for example 'Sheet1'!A1:Z200).{suffix}"
+        ),
+        error_code="INVALID_RANGE",
+        retryable=False,
+        original_error=original,
+    )
 
 
 class SheetsService:
@@ -149,7 +240,52 @@ class SheetsService:
         except HttpError as e:
             raise normalize_google_error(e)
 
-    def read_range(self, spreadsheet_id: str, range_a1: str) -> List[List[Any]]:
+    def _values_get(self, spreadsheet_id: str, range_a1: str) -> List[List[Any]]:
+        result = (
+            self._sheets.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range=range_a1)
+            .execute()
+        )
+        return result.get("values", [])
+
+    def _read_values_with_tab_resolve(
+        self, spreadsheet_id: str, range_a1: str
+    ) -> Tuple[List[List[Any]], str]:
+        """Fetch A1 values; remap a missing tab, never invent cell bounds."""
+        title, cells = split_a1_range(range_a1)
+        attempts = [range_a1]
+        if title:
+            quoted = quote_a1_range(title, cells)
+            if quoted not in attempts:
+                attempts.append(quoted)
+        last_err: Optional[Exception] = None
+        for attempt in attempts:
+            try:
+                return self._values_get(spreadsheet_id, attempt), attempt
+            except HttpError as exc:
+                last_err = exc
+                if not is_unparseable_sheet_range_error(exc):
+                    raise normalize_google_error(exc) from exc
+        tabs = self.list_tabs(spreadsheet_id)
+        titles = [str(t.get("title") or "") for t in tabs]
+        if cells and not looks_like_a1_cells(cells):
+            raise _invalid_range_error(range_a1, titles, last_err)
+        chosen = pick_sheet_title(title, titles)
+        if chosen:
+            resolved = quote_a1_range(chosen, cells)
+            if resolved not in attempts:
+                try:
+                    return self._values_get(spreadsheet_id, resolved), resolved
+                except HttpError as exc:
+                    if is_unparseable_sheet_range_error(exc):
+                        raise _invalid_range_error(range_a1, titles, exc) from exc
+                    raise normalize_google_error(exc) from exc
+        raise _invalid_range_error(range_a1, titles, last_err)
+
+    def read_range_resolved(
+        self, spreadsheet_id: str, range_a1: str
+    ) -> Tuple[List[List[Any]], str]:
         if not range_a1:
             raise GoogleWorkspaceError(
                 "range is required (A1 notation)",
@@ -157,16 +293,11 @@ class SheetsService:
                 retryable=False,
             )
         self._ensure_native_google_sheet(spreadsheet_id)
-        try:
-            result = (
-                self._sheets.spreadsheets()
-                .values()
-                .get(spreadsheetId=spreadsheet_id, range=range_a1)
-                .execute()
-            )
-            return result.get("values", [])
-        except HttpError as e:
-            raise normalize_google_error(e)
+        return self._read_values_with_tab_resolve(spreadsheet_id, range_a1)
+
+    def read_range(self, spreadsheet_id: str, range_a1: str) -> List[List[Any]]:
+        values, _resolved = self.read_range_resolved(spreadsheet_id, range_a1)
+        return values
 
     def update_range(
         self,

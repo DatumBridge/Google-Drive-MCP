@@ -13,6 +13,7 @@
 2. Calls product tool (`read_document`, `update_sheet_range`, …) with credentials
 3. On `AUTH_ERROR` after refresh failure (`invalid_grant`) → operator reconnects Google Drive under Account → Integrations.
 4. On `RATE_LIMIT` → backoff and retry
+5. On Sheets `INVALID_RANGE` / `Unable to parse range` → `read_sheet_range` remaps a missing tab when the match is unique (convert-default `Sheet1`, underscore/space, or a unique budget word); otherwise bind `range` to a live tab title (ADR-0005)
 
 ## Create with parent (ADR-0004)
 

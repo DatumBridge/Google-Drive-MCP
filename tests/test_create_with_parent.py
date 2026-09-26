@@ -3,13 +3,19 @@
 from unittest.mock import MagicMock
 
 from fastmcp import FastMCP
+from googleapiclient.errors import HttpError
 
 from app.core.exceptions import DrivePermissionError, GoogleWorkspaceError, normalize_google_error
 from app.services.diagram_service import DiagramService
 from app.services.docs_service import DocsService
 from app.services.drive_service import DriveService
 from app.services.forms_service import FormsService
-from app.services.sheets_service import SheetsService
+from app.services.sheets_service import (
+    SheetsService,
+    pick_sheet_title,
+    quote_a1_range,
+    split_a1_range,
+)
 from app.services.slides_service import SlidesService
 from app.tools import register_all
 from scripts.test_mcp_tools import EXPECTED_TOOLS
@@ -278,6 +284,121 @@ def test_coerce_drive_list_query_wraps_natural_language():
         == "mimeType='application/vnd.google-apps.spreadsheet'"
     )
     assert coerce_drive_list_query("name contains 'budget'") == "name contains 'budget'"
+
+
+def _unparseable_range_http_error(a1: str) -> HttpError:
+    resp = MagicMock()
+    resp.status = 400
+    resp.reason = "Bad Request"
+    body = (
+        f'<HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/'
+        f'sheet-id/values/{a1}?alt=json returned "Unable to parse range: {a1}". '
+        f'Details: "Unable to parse range: {a1}">'
+    ).encode()
+    return HttpError(resp, body)
+
+
+def _native_sheet_service(tabs: list[str]):
+    from app.schemas.drive import FileMetadata
+
+    svc = SheetsService.__new__(SheetsService)
+    svc._drive = MagicMock()
+    svc._drive.get_metadata.return_value = FileMetadata(
+        id="sheet-1",
+        name="Budget 2026",
+        mime_type="application/vnd.google-apps.spreadsheet",
+    )
+    ss = MagicMock()
+    svc._sheets = MagicMock()
+    svc._sheets.spreadsheets.return_value = ss
+    ss.get.return_value.execute.return_value = {
+        "sheets": [
+            {"properties": {"sheetId": i, "title": title, "index": i}}
+            for i, title in enumerate(tabs)
+        ]
+    }
+    return svc, ss
+
+
+def test_split_and_quote_a1_range():
+    assert split_a1_range("Budget_2026!A1:Z200") == ("Budget_2026", "A1:Z200")
+    assert split_a1_range("'Budget 2026'!A1:Z200") == ("Budget 2026", "A1:Z200")
+    assert split_a1_range("A1:Z200") == (None, "A1:Z200")
+    assert quote_a1_range("Sheet1", "A1:Z200") == "'Sheet1'!A1:Z200"
+
+
+def test_pick_sheet_title_unique_and_budget_aliases():
+    assert pick_sheet_title("Budget_2026", ["Sheet1"]) == "Sheet1"
+    assert pick_sheet_title("Budget_2026", ["Budget 2026"]) == "Budget 2026"
+    assert pick_sheet_title("budget_2026", ["Budget_2026"]) == "Budget_2026"
+    assert pick_sheet_title("Budget_2026", ["Sheet1", "Data"]) is None
+    assert pick_sheet_title("Ngân sách", ["Q1", "Budget 2026"]) == "Budget 2026"
+    assert pick_sheet_title("Budget_2026", ["Payroll"]) is None
+    assert pick_sheet_title("Budget_2026", ["Budget Q1", "Budget Q2"]) is None
+    assert pick_sheet_title("Budget_2026", ["budgeting"]) is None
+
+
+def test_normalize_google_error_unparseable_range_is_invalid_range():
+    err = normalize_google_error(_unparseable_range_http_error("Budget_2026!A1:Z200"))
+    assert err.error_code == "INVALID_RANGE"
+    assert "Unable to parse range" in err.message
+
+
+def test_read_range_uses_unique_tab_when_authored_tab_missing():
+    svc, ss = _native_sheet_service(["Sheet1"])
+
+    def values_get(*, spreadsheetId, range):
+        req = MagicMock()
+        if range in ("Budget_2026!A1:Z200", "'Budget_2026'!A1:Z200"):
+            req.execute.side_effect = _unparseable_range_http_error(range)
+        elif range == "'Sheet1'!A1:Z200":
+            req.execute.return_value = {"values": [["item", "amount"]]}
+        else:
+            raise AssertionError(f"unexpected range {range!r}")
+        return req
+
+    ss.values.return_value.get.side_effect = values_get
+    values = svc.read_range("sheet-1", "Budget_2026!A1:Z200")
+    assert values == [["item", "amount"]]
+
+
+def test_read_range_quotes_tab_with_spaces():
+    svc, ss = _native_sheet_service(["Budget 2026"])
+
+    def values_get(*, spreadsheetId, range):
+        req = MagicMock()
+        if range == "Budget 2026!A1:Z200":
+            req.execute.side_effect = _unparseable_range_http_error(range)
+        elif range == "'Budget 2026'!A1:Z200":
+            req.execute.return_value = {"values": [["ok"]]}
+        else:
+            raise AssertionError(f"unexpected range {range!r}")
+        return req
+
+    ss.values.return_value.get.side_effect = values_get
+    ss.get.return_value.execute.reset_mock()
+    values = svc.read_range("sheet-1", "Budget 2026!A1:Z200")
+    assert values == [["ok"]]
+    ss.get.return_value.execute.assert_not_called()
+
+
+def test_read_range_invalid_range_lists_real_tabs():
+    svc, ss = _native_sheet_service(["Q1", "Q2"])
+
+    def values_get(*, spreadsheetId, range):
+        req = MagicMock()
+        req.execute.side_effect = _unparseable_range_http_error(range)
+        return req
+
+    ss.values.return_value.get.side_effect = values_get
+    try:
+        svc.read_range("sheet-1", "Budget_2026!A1:Z200")
+        raise AssertionError("expected INVALID_RANGE")
+    except GoogleWorkspaceError as err:
+        assert err.error_code == "INVALID_RANGE"
+        assert "Q1" in err.message
+        assert "Q2" in err.message
+        assert "Budget_2026" in err.message
 
 
 def test_read_range_rejects_xlsx_office_file():

@@ -18,6 +18,7 @@ It is a tool server, not a token vault / multi-tenant relay. Callers pass OAuth 
 | 403 `SERVICE_DISABLED` | `API_NOT_ENABLED` — enable Sheets/Docs/… API on the OAuth GCP project (not PERMISSION_DENIED / reconnect) |
 | Access token expiry | `get_credentials` refreshes when `expiry` is missing or expired; failed refresh → `AUTH_ERROR` (reconnect Integrations) |
 | Drive `q` 400 Invalid Value | `INVALID_QUERY` (not AUTH_ERROR); free text wrapped as `name contains` |
+| Sheets 400 `Unable to parse range` | Quote tab; remap to unique/budget/convert-default `Sheet1`; keep cell bounds; else `INVALID_RANGE` (ADR-0005) |
 
 ## Impacted components
 

@@ -34,7 +34,11 @@ def register(mcp) -> None:
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
         parent_folder_id: Optional[str] = Field(default=None, description="Optional Drive parent folder ID"),
     ) -> CreateFormResponse:
-        """Create a Google Form."""
+        """Create a Google Form.
+
+        Capabilities: drive.create_form
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return CreateFormResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -52,7 +56,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> GetFormResponseModel:
-        """Read form structure (title, description, questions)."""
+        """Read form structure (title, description, questions).
+
+        Capabilities: drive.get_form
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return GetFormResponseModel(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -77,7 +85,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> UpdateFormInfoResponse:
-        """Update form title and/or description."""
+        """Update form title and/or description.
+
+        Capabilities: drive.update_form_info
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return UpdateFormInfoResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -107,7 +119,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> AddFormQuestionResponse:
-        """Add a question to a Google Form."""
+        """Add a question to a Google Form.
+
+        Capabilities: drive.add_form_question
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return AddFormQuestionResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -136,7 +152,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ListFormResponsesResponse:
-        """List form responses (read-only). Set include_answers=true only when answer payloads are required."""
+        """List form responses (read-only). Set include_answers=true only when answer payloads are required.
+
+        Capabilities: drive.list_form_responses
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return ListFormResponsesResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
@@ -167,7 +187,11 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> GetFormResponseDetailResponse:
-        """Get a single form response by ID (read-only). Set include_answers=true to load answers."""
+        """Get a single form response by ID (read-only). Set include_answers=true to load answers.
+
+        Capabilities: drive.get_form_response
+Outputs: success
+        """
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return GetFormResponseDetailResponse(

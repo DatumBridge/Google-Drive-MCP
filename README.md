@@ -33,7 +33,7 @@ MCP Server for Google Drive and Workspace content (Docs, Sheets, Slides, Forms, 
 |------|-------------|
 | `create_spreadsheet` | Create a spreadsheet |
 | `list_sheet_tabs` | List tabs |
-| `read_sheet_range` | Read A1 range |
+| `read_sheet_range` | Read A1 range (`resolved_range` is the live tab when remapped) |
 | `update_sheet_range` | Write/overwrite range |
 | `append_sheet_rows` | Append rows |
 | `clear_sheet_range` | Clear range |

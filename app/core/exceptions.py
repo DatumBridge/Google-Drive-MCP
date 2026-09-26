@@ -137,6 +137,28 @@ def _is_office_file_error(blob: str) -> bool:
     )
 
 
+def _is_unparseable_sheet_range(blob: str) -> bool:
+    return "unable to parse range" in (blob or "").lower()
+
+
+def is_unparseable_sheet_range_error(exc: Exception) -> bool:
+    return _is_unparseable_sheet_range(_error_blob(exc))
+
+
+def _unparseable_sheet_range_error(exc: Exception, blob: str) -> GoogleWorkspaceError:
+    original = blob.strip().split("\n", 1)[0]
+    return GoogleWorkspaceError(
+        message=(
+            "Unable to parse the A1 range. The tab name in range may not exist on "
+            "this Google Sheet (Excel convert often names the tab Sheet1). "
+            f"Original: {original}"
+        ),
+        error_code="INVALID_RANGE",
+        retryable=False,
+        original_error=exc,
+    )
+
+
 def _is_invalid_drive_query(blob: str) -> bool:
     """Drive files.list 400 Invalid Value on q — not an OAuth failure."""
     lower = blob.lower()
@@ -216,6 +238,8 @@ def normalize_google_error(exc: Exception) -> GoogleWorkspaceError:
             retryable=False,
             original_error=exc,
         )
+    if _is_unparseable_sheet_range(blob):
+        return _unparseable_sheet_range_error(exc, blob)
     if _is_invalid_drive_query(blob):
         return _invalid_drive_query_error(exc, blob)
 

@@ -37,6 +37,10 @@ Contract: create success + parent failure ⇒ `success=true`, resource id presen
 
 draw.io `create_diagram` sets parents at Drive create time; `parent_applied` is `true` only when a parent was provided and upload succeeded.
 
+## `read_sheet_range`
+
+Input is unchanged: `spreadsheet_id`, `range` (A1). On success, `range` is the authored A1 and `resolved_range` is the A1 actually sent to Sheets (same when no remap). Tab remap never invents cell bounds.
+
 ## Error codes
 
 | Code | Meaning | Retryable |
@@ -48,6 +52,7 @@ draw.io `create_diagram` sets parents at Drive create time; `parent_applied` is 
 | `PERMISSION_DENIED` | 403 / missing scopes | no |
 | `API_NOT_ENABLED` | 403 `SERVICE_DISABLED` — product API (Sheets, Docs, …) not enabled on the OAuth GCP project | yes (after operator enables the API) |
 | `OFFICE_FILE_NOT_SUPPORTED` | Drive file is Excel/Office (`.xlsx`), not a native Google Sheet | no |
+| `INVALID_RANGE` | Sheets 400 `Unable to parse range` after remap — tab missing or ambiguous; message lists live tab titles when tabs were listed | no |
 | `FILE_IN_TRASH` | `spreadsheet_id` still points at a file in Drive Trash | no |
 | `NOT_FOUND` | 404 | no |
 | `RATE_LIMIT` | 429 | yes |

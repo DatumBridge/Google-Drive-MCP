@@ -34,3 +34,5 @@ On the **same** Google Cloud project as the OAuth client (`GOOGLE_OAUTH_CLIENT_I
 `list_files` only needs Drive. `read_sheet_range` / `create_spreadsheet` need **Sheets** as well. A 403 `SERVICE_DISABLED` / `API_NOT_ENABLED` means enable that product API, wait a few minutes, and retry — do not reconnect Integrations.
 
 Uploaded **Excel `.xlsx` files in Drive are not Google Sheets**. `read_sheet_range` returns `OFFICE_FILE_NOT_SUPPORTED`. Convert: Drive → Open with → Google Sheets, then use the new native file id.
+
+**Tab names:** a static A1 `range` such as `Budget_2026!A1:Z200` often does not match the converted tab (`Sheet1`). `read_sheet_range` remaps the tab and keeps the cell bounds. Ambiguous workbooks return `INVALID_RANGE` with live tab titles.

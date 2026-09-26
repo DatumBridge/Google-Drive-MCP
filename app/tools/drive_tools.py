@@ -43,6 +43,7 @@ def register(mcp) -> None:
         content_base64: Optional[str] = Field(
             default=None,
             description="File content as base64-encoded string (use for binary or text)",
+            json_schema_extra={"x-datumbridge-encoding": "base64"},
         ),
         file_path: Optional[str] = Field(
             default=None,
@@ -61,6 +62,10 @@ def register(mcp) -> None:
         Upload a file to Google Drive.
         Provide either content_base64 (for MCP clients) or file_path (for server-side files).
         Credentials must be passed as credentials_path or credentials_json.
+        
+
+        Capabilities: drive.upload_file
+Outputs: success
         """
         logger.info(f"MCP: Uploading file {file_name}")
         try:
@@ -113,6 +118,10 @@ def register(mcp) -> None:
         """
         Download a file from Google Drive by ID.
         Returns content as base64 (default) or plain text for text files.
+        
+
+        Capabilities: drive.download_file
+Outputs: success
         """
         logger.info(f"MCP: Downloading file {file_id}")
         try:
@@ -172,6 +181,10 @@ def register(mcp) -> None:
         """
         List files and folders in a Google Drive folder.
         Returns file metadata including id, name, mimeType, size, timestamps.
+        
+
+        Capabilities: drive.list_files
+Outputs: success
         """
         logger.info(f"MCP: Listing files in folder={folder_id}, page_size={page_size}")
         try:
@@ -222,6 +235,10 @@ def register(mcp) -> None:
     ) -> CreateFolderResponse:
         """
         Create a new folder in Google Drive.
+        
+
+        Capabilities: drive.create_folder
+Outputs: success
         """
         logger.info(f"MCP: Creating folder {folder_name}")
         try:
@@ -262,6 +279,10 @@ def register(mcp) -> None:
     ) -> MoveResponse:
         """
         Move a file or folder to a different parent folder.
+        
+
+        Capabilities: drive.move_file
+Outputs: success
         """
         logger.info(f"MCP: Moving file {file_id} to folder {new_parent_folder_id}")
         try:
@@ -302,6 +323,10 @@ def register(mcp) -> None:
         Permanently delete a file or folder from Google Drive.
         This bypasses trash — the file cannot be recovered.
         Requires confirm=true as an explicit agent/operator gate.
+        
+
+        Capabilities: drive.delete_file
+Outputs: success
         """
         try:
             if not confirm:
@@ -343,6 +368,10 @@ def register(mcp) -> None:
     ) -> GetMetadataResponse:
         """
         Get metadata for a file or folder (name, size, mimeType, timestamps, etc.).
+        
+
+        Capabilities: drive.get_file_metadata
+Outputs: success
         """
         logger.info(f"MCP: Getting metadata for file {file_id}")
         try:
