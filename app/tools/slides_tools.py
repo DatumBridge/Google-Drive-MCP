@@ -35,6 +35,16 @@ def register(mcp) -> None:
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
         parent_folder_id: Optional[str] = Field(default=None, description="Optional Drive parent folder ID"),
+        slides: Optional[str] = Field(
+            default=None,
+            description="Slide content as a JSON array of {title, body}. Plain text is written as one slide. Do not pass [].",
+            json_schema_extra={"x-datumbridge-encoding": "plain"},
+        ),
+        description: Optional[str] = Field(
+            default=None,
+            description="Body of the first slide when slides is empty. Used so the deck is not created blank.",
+            json_schema_extra={"x-datumbridge-encoding": "plain"},
+        ),
     ) -> CreatePresentationResponse:
         """Create a Google Slides presentation.
 
@@ -45,7 +55,10 @@ Outputs: success
             if credentials_missing(credentials_path, credentials_json):
                 return CreatePresentationResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
             result = get_slides(credentials_path, credentials_json).create_presentation(
-                title=title, parent_folder_id=parent_folder_id
+                title=title,
+                parent_folder_id=parent_folder_id,
+                slides=slides,
+                description=description,
             )
             return CreatePresentationResponse(success=True, **result)
         except DriveError as e:

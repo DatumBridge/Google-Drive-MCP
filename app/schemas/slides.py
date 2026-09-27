@@ -26,6 +26,7 @@ class CreatePresentationResponse(BaseModel):
     presentation_url: Optional[str] = None
     parent_applied: Optional[bool] = None
     parent_error: Optional[ErrorResponse] = None
+    slides_written: int = 0
     error: Optional[ErrorResponse] = None
 
 

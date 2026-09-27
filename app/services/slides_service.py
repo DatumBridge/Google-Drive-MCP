@@ -3,6 +3,7 @@ Google Slides API wrapper — text-centric agent operations.
 """
 
 from typing import List, Optional, Tuple
+import json
 import uuid
 
 from googleapiclient.errors import HttpError
@@ -21,6 +22,60 @@ EXPORT_MIME_MAP = {
 }
 
 MAX_EXPORT_BYTES = 25 * 1024 * 1024
+MAX_SLIDES = 20
+
+
+def parse_slide_outline(slides, description: Optional[str] = None, title: str = "") -> List[dict]:
+    """Turn planner slide payloads into title/body pairs.
+
+    An empty list falls back to description so a successful create is not a blank deck.
+    """
+    items = _coerce_slides(slides)
+    if items:
+        return items
+    body = (description or "").strip()
+    if not body or body in ("[]", "null", "{}"):
+        return []
+    heading = (title or "Slide").strip() or "Slide"
+    if body == heading:
+        return []
+    return [{"title": heading[:200], "body": body[:8000]}]
+
+
+def _coerce_slides(slides) -> List[dict]:
+    if slides is None:
+        return []
+    if isinstance(slides, str):
+        text = slides.strip()
+        if text in ("", "[]", "null", "{}"):
+            return []
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return [{"title": "", "body": text[:8000]}]
+        return _coerce_slides(parsed)
+    if isinstance(slides, dict):
+        one = _one_slide(slides)
+        return [one] if one["title"] or one["body"] else []
+    if isinstance(slides, list):
+        out = []
+        for item in slides[:MAX_SLIDES]:
+            if isinstance(item, str) and item.strip() and item.strip() not in ("[]", "null"):
+                out.append({"title": "", "body": item.strip()[:8000]})
+            elif isinstance(item, dict):
+                one = _one_slide(item)
+                if one["title"] or one["body"]:
+                    out.append(one)
+        return out
+    return []
+
+
+def _one_slide(item: dict) -> dict:
+    heading = str(item.get("title") or item.get("heading") or "").strip()[:200]
+    body = str(
+        item.get("body") or item.get("text") or item.get("content") or item.get("notes") or ""
+    ).strip()[:8000]
+    return {"title": heading, "body": body}
 
 
 class SlidesService:
@@ -42,6 +97,8 @@ class SlidesService:
         self,
         title: str = "Untitled presentation",
         parent_folder_id: Optional[str] = None,
+        slides=None,
+        description: Optional[str] = None,
     ) -> dict:
         try:
             presentation = (
@@ -60,12 +117,16 @@ class SlidesService:
         except GoogleWorkspaceError:
             # Create already succeeded — keep resource id (ADR-0004)
             pass
+        outline = parse_slide_outline(slides, description, title)
+        if outline:
+            self.fill_outline(presentation_id, outline)
         return {
             "presentation_id": presentation_id,
             "title": presentation.get("title", title),
             "presentation_url": presentation_url,
             "parent_applied": parent_applied,
             "parent_error": parent_error,
+            "slides_written": len(outline),
         }
 
     def list_slides(self, presentation_id: str) -> List[dict]:
@@ -87,6 +148,18 @@ class SlidesService:
             return slides
         except HttpError as e:
             raise normalize_google_error(e)
+
+    def fill_outline(self, presentation_id: str, outline: List[dict]) -> None:
+        existing = self.list_slides(presentation_id)
+        for index, slide in enumerate(outline):
+            text = "\n".join(part for part in (slide.get("title"), slide.get("body")) if part)
+            if not text:
+                continue
+            if index == 0 and existing:
+                self.insert_text(presentation_id, text, slide_object_id=existing[0]["object_id"])
+                continue
+            slide_id = self.add_slide(presentation_id, layout="BLANK")
+            self.insert_text(presentation_id, text, slide_object_id=slide_id)
 
     def read_presentation(self, presentation_id: str) -> dict:
         try:

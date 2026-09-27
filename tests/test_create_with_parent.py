@@ -554,3 +554,26 @@ def test_delete_file_tool_confirm_default_false():
     delete_fn = mcp._tool_manager._tools["delete_file"].fn
     confirm_default = inspect.signature(delete_fn).parameters["confirm"].default
     assert getattr(confirm_default, "default", confirm_default) is False
+
+
+def test_parse_slide_outline_uses_description_when_slides_empty():
+    from app.services.slides_service import parse_slide_outline
+
+    slides = parse_slide_outline("[]", "GDP rose 8.02 percent in 2022.", "Vietnam GDP")
+    assert slides == [{"title": "Vietnam GDP", "body": "GDP rose 8.02 percent in 2022."}]
+    parsed = parse_slide_outline('[{"title":"2022","body":"8.02%"}]', None, "Vietnam GDP")
+    assert parsed[0]["body"] == "8.02%"
+
+
+def test_fill_outline_writes_first_slide_and_adds_the_next():
+    svc = SlidesService.__new__(SlidesService)
+    svc.list_slides = MagicMock(return_value=[{"object_id": "s1"}])
+    svc.add_slide = MagicMock(return_value="s2")
+    svc.insert_text = MagicMock()
+    svc.fill_outline(
+        "pres-1",
+        [{"title": "2022", "body": "8.02%"}, {"title": "2024", "body": "8.0%"}],
+    )
+    svc.insert_text.assert_any_call("pres-1", "2022\n8.02%", slide_object_id="s1")
+    svc.add_slide.assert_called_once_with("pres-1", layout="BLANK")
+    svc.insert_text.assert_any_call("pres-1", "2024\n8.0%", slide_object_id="s2")
