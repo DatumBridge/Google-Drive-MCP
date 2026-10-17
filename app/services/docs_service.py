@@ -4,7 +4,10 @@ Google Docs API wrapper.
 Agent-friendly helpers hide raw Docs index arithmetic where possible.
 """
 
-from typing import Optional, Tuple
+import io
+import zipfile
+import xml.etree.ElementTree as ET
+from typing import Any, Dict, List, Optional, Tuple
 
 from googleapiclient.errors import HttpError
 
@@ -81,6 +84,274 @@ class DocsService:
             }
         except HttpError as e:
             raise normalize_google_error(e)
+
+    def read_single_document(
+        self,
+        file_id: str,
+        name: Optional[str] = None,
+        mime_type: Optional[str] = None,
+    ) -> dict:
+        """Read a single document/file and return text content."""
+        try:
+            # If name or mime_type not provided, fetch metadata
+            if not mime_type or not name:
+                try:
+                    meta = self._drive.get_metadata(file_id)
+                    name = name or meta.name
+                    mime_type = mime_type or meta.mime_type
+                except Exception:
+                    pass
+
+            # 1. Google Docs native format
+            if mime_type == "application/vnd.google-apps.document":
+                # Try Docs API first
+                try:
+                    doc = self._docs.documents().get(documentId=file_id).execute()
+                    text = self._extract_text(doc)
+                    return {
+                        "document_id": file_id,
+                        "name": name or doc.get("title"),
+                        "title": name or doc.get("title"),
+                        "mime_type": mime_type,
+                        "text": text,
+                        "success": True,
+                        "error": None,
+                    }
+                except Exception:
+                    # Fallback to Drive API export (works even if Docs API is disabled)
+                    export_bytes = (
+                        self._drive.service.files()
+                        .export(fileId=file_id, mimeType="text/plain")
+                        .execute()
+                    )
+                    text = (
+                        export_bytes.decode("utf-8", errors="replace")
+                        if isinstance(export_bytes, bytes)
+                        else str(export_bytes)
+                    )
+                    return {
+                        "document_id": file_id,
+                        "name": name,
+                        "title": name,
+                        "mime_type": mime_type,
+                        "text": text,
+                        "success": True,
+                        "error": None,
+                    }
+
+            lower_name = (name or "").lower()
+            unsupported_exts = (
+                ".zip", ".rar", ".7z", ".tar", ".gz", ".exe", ".bin", ".dmg", ".iso",
+                ".png", ".jpg", ".jpeg", ".gif", ".webp", ".mp4", ".mp3", ".avi", ".mkv",
+            )
+            if (
+                any(lower_name.endswith(ext) for ext in unsupported_exts)
+                or (
+                    mime_type
+                    and (
+                        "zip" in mime_type
+                        or "compressed" in mime_type
+                        or mime_type.startswith("image/")
+                        or mime_type.startswith("audio/")
+                        or mime_type.startswith("video/")
+                        or "application/x-msdownload" in mime_type
+                        or "application/octet-stream" in mime_type
+                    )
+                    and not lower_name.endswith(".docx")
+                    and not lower_name.endswith(".pdf")
+                    and mime_type != "application/pdf"
+                )
+            ):
+                return {
+                    "document_id": file_id,
+                    "name": name,
+                    "title": name,
+                    "mime_type": mime_type,
+                    "text": None,
+                    "success": False,
+                    "error": f"File '{name}' ({mime_type}) is a binary file and cannot be read as text.",
+                }
+
+            # 2. Download content from Drive for other types
+            content_bytes, dl_mime, dl_name = self._drive.download_file(file_id)
+            name = name or dl_name
+            mime_type = mime_type or dl_mime
+
+            # PDF (.pdf)
+            if (name and name.lower().endswith(".pdf")) or (mime_type == "application/pdf"):
+                try:
+                    import pypdf
+
+                    reader = pypdf.PdfReader(io.BytesIO(content_bytes))
+                    pages_text = []
+                    for page in reader.pages:
+                        page_txt = page.extract_text() or ""
+                        if page_txt.strip():
+                            pages_text.append(page_txt.strip())
+                    text = "\n\n".join(pages_text)
+                    return {
+                        "document_id": file_id,
+                        "name": name,
+                        "title": name,
+                        "mime_type": mime_type or "application/pdf",
+                        "text": text,
+                        "success": True,
+                        "error": None,
+                    }
+                except Exception as pdf_err:
+                    return {
+                        "document_id": file_id,
+                        "name": name,
+                        "title": name,
+                        "mime_type": mime_type or "application/pdf",
+                        "text": None,
+                        "success": False,
+                        "error": f"Failed to extract text from PDF: {pdf_err}",
+                    }
+
+            # Word .docx
+            if (name and name.lower().endswith(".docx")) or (
+                mime_type
+                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ):
+                with zipfile.ZipFile(io.BytesIO(content_bytes)) as z:
+                    xml_content = z.read("word/document.xml")
+                    tree = ET.fromstring(xml_content)
+                    paragraphs = []
+                    for p in tree.iter(
+                        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+                    ):
+                        t_nodes = [
+                            node.text
+                            for node in p.iter(
+                                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+                            )
+                            if node.text
+                        ]
+                        if t_nodes:
+                            paragraphs.append("".join(t_nodes))
+                    text = "\n".join(paragraphs)
+                    return {
+                        "document_id": file_id,
+                        "name": name,
+                        "title": name,
+                        "mime_type": mime_type,
+                        "text": text,
+                        "success": True,
+                        "error": None,
+                    }
+
+            # Text / XML / JSON / CSV / MD / Code
+            if (
+                (
+                    mime_type
+                    and (
+                        mime_type.startswith("text/")
+                        or "xml" in mime_type
+                        or "json" in mime_type
+                        or "csv" in mime_type
+                        or "yaml" in mime_type
+                    )
+                )
+                or (
+                    name
+                    and any(
+                        name.lower().endswith(ext)
+                        for ext in [
+                            ".txt",
+                            ".xml",
+                            ".json",
+                            ".csv",
+                            ".tsv",
+                            ".md",
+                            ".yaml",
+                            ".yml",
+                            ".html",
+                            ".htm",
+                            ".log",
+                        ]
+                    )
+                )
+            ):
+                text = content_bytes.decode("utf-8", errors="replace")
+                return {
+                    "document_id": file_id,
+                    "name": name,
+                    "title": name,
+                    "mime_type": mime_type,
+                    "text": text,
+                    "success": True,
+                    "error": None,
+                }
+
+            # Unsupported binary type
+            return {
+                "document_id": file_id,
+                "name": name,
+                "title": name,
+                "mime_type": mime_type,
+                "text": None,
+                "success": False,
+                "error": f"File '{name}' ({mime_type}) is not a supported text document format.",
+            }
+
+        except Exception as e:
+            return {
+                "document_id": file_id,
+                "name": name,
+                "title": name,
+                "mime_type": mime_type,
+                "text": None,
+                "success": False,
+                "error": str(e),
+            }
+
+    def read_documents(
+        self,
+        files: Optional[List[Any]] = None,
+        document_ids: Optional[List[str]] = None,
+    ) -> List[dict]:
+        """
+        Read multiple documents/files as text.
+        Accepts:
+          - files: list of file dicts (from list_files), or list of file IDs.
+          - document_ids: list of document/file ID strings.
+        """
+        target_items = []
+        if files:
+            for item in files:
+                if isinstance(item, dict):
+                    f_id = item.get("id") or item.get("document_id")
+                    if f_id:
+                        target_items.append({
+                            "id": str(f_id),
+                            "name": item.get("name") or item.get("title"),
+                            "mime_type": item.get("mime_type"),
+                        })
+                elif hasattr(item, "id"):
+                    target_items.append({
+                        "id": str(item.id),
+                        "name": getattr(item, "name", None),
+                        "mime_type": getattr(item, "mime_type", None),
+                    })
+                elif isinstance(item, str) and item.strip():
+                    target_items.append({"id": item.strip(), "name": None, "mime_type": None})
+
+        if document_ids:
+            for doc_id in document_ids:
+                if isinstance(doc_id, str) and doc_id.strip():
+                    if not any(t["id"] == doc_id.strip() for t in target_items):
+                        target_items.append({"id": doc_id.strip(), "name": None, "mime_type": None})
+
+        results = []
+        for item in target_items:
+            res = self.read_single_document(
+                file_id=item["id"],
+                name=item.get("name"),
+                mime_type=item.get("mime_type"),
+            )
+            results.append(res)
+        return results
 
     def append_text(self, document_id: str, text: str) -> None:
         if not text:

@@ -474,7 +474,7 @@ def test_all_expected_tools_registered():
     register_all(mcp)
     names = set(mcp._tool_manager._tools.keys())
     assert names == EXPECTED_TOOLS
-    assert len(names) == 39
+    assert len(names) == 40
 
 
 def test_delete_file_requires_confirm():
@@ -577,3 +577,127 @@ def test_fill_outline_writes_first_slide_and_adds_the_next():
     svc.insert_text.assert_any_call("pres-1", "2022\n8.02%", slide_object_id="s1")
     svc.add_slide.assert_called_once_with("pres-1", layout="BLANK")
     svc.insert_text.assert_any_call("pres-1", "2024\n8.0%", slide_object_id="s2")
+
+
+def test_list_files_default_page_size_is_10():
+    drive = DriveService.__new__(DriveService)
+    listed = MagicMock()
+    listed.execute.return_value = {"files": [], "nextPageToken": None}
+    files_api = MagicMock()
+    files_api.list.return_value = listed
+    drive._service = MagicMock()
+    drive._service.files.return_value = files_api
+    drive.list_files()
+    kwargs = files_api.list.call_args.kwargs
+    assert kwargs.get("pageSize") == 10
+
+
+def test_list_files_navigates_to_page_2():
+    drive = DriveService.__new__(DriveService)
+    # Page 1 call returns nextPageToken = "token_page_2"
+    page1_mock = MagicMock()
+    page1_mock.execute.return_value = {"nextPageToken": "token_page_2"}
+    # Page 2 call returns files and nextPageToken = "token_page_3"
+    page2_mock = MagicMock()
+    page2_mock.execute.return_value = {
+        "files": [{"id": "f2", "name": "file2.txt", "mimeType": "text/plain"}],
+        "nextPageToken": "token_page_3",
+    }
+    files_api = MagicMock()
+    files_api.list.side_effect = [page1_mock, page2_mock]
+    drive._service = MagicMock()
+    drive._service.files.return_value = files_api
+
+    files, next_token = drive.list_files(page=2, page_size=10)
+    assert len(files) == 1
+    assert files[0].id == "f2"
+    assert next_token == "token_page_3"
+    assert files_api.list.call_count == 2
+    # Verify first call asked for nextPageToken
+    assert files_api.list.call_args_list[0].kwargs.get("fields") == "nextPageToken"
+    # Verify second call used token_page_2
+    assert files_api.list.call_args_list[1].kwargs.get("pageToken") == "token_page_2"
+
+
+def test_list_files_tool_default_parameters():
+    from app.tools import drive_tools
+    import inspect
+
+    mcp = FastMCP("t_list")
+    drive_tools.register(mcp)
+    list_fn = mcp._tool_manager._tools["list_files"].fn
+    params = inspect.signature(list_fn).parameters
+
+    page_size_def = params["page_size"].default
+    assert getattr(page_size_def, "default", page_size_def) == 10
+
+    page_def = params["page"].default
+    assert getattr(page_def, "default", page_def) == 1
+
+
+def test_read_documents_service_with_files_array():
+    from app.services.docs_service import DocsService
+
+    svc = DocsService.__new__(DocsService)
+    svc._drive = MagicMock()
+    svc._docs = MagicMock()
+    # Mock download_file for plain text
+    svc._drive.download_file.return_value = (b"Sample XML Content", "text/xml", "test.xml")
+
+    files_input = [
+        {"id": "doc-1", "name": "test.xml", "mime_type": "text/xml"}
+    ]
+    results = svc.read_documents(files=files_input)
+    assert len(results) == 1
+    assert results[0]["document_id"] == "doc-1"
+    assert results[0]["name"] == "test.xml"
+    assert results[0]["text"] == "Sample XML Content"
+    assert results[0]["success"] is True
+
+
+def test_read_documents_tool_rejects_empty():
+    from app.tools import docs_tools
+
+    mcp = FastMCP("t_docs")
+    docs_tools.register(mcp)
+    read_docs_fn = mcp._tool_manager._tools["read_documents"].fn
+    res = read_docs_fn(
+        files=None,
+        document_ids=None,
+        credentials_path="/tmp/token.json",
+        credentials_json=None,
+    )
+    assert res.success is False
+    err_msg = res.error.error_message if hasattr(res.error, "error_message") else res.error["error_message"]
+    assert "Either 'files' or 'document_ids' must be provided" in err_msg
+
+
+def test_read_documents_service_with_pdf():
+    import io
+    from app.services.docs_service import DocsService
+    from pypdf import PdfWriter
+
+    # Build valid in-memory PDF
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    pdf_bytes_io = io.BytesIO()
+    writer.write(pdf_bytes_io)
+    pdf_bytes = pdf_bytes_io.getvalue()
+
+    svc = DocsService.__new__(DocsService)
+    svc._drive = MagicMock()
+    svc._docs = MagicMock()
+    svc._drive.download_file.return_value = (pdf_bytes, "application/pdf", "sample.pdf")
+
+    files_input = [
+        {"id": "pdf-1", "name": "sample.pdf", "mime_type": "application/pdf"}
+    ]
+    results = svc.read_documents(files=files_input)
+    assert len(results) == 1
+    assert results[0]["document_id"] == "pdf-1"
+    assert results[0]["name"] == "sample.pdf"
+    assert results[0]["success"] is True
+    assert results[0]["error"] is None
+
+
+

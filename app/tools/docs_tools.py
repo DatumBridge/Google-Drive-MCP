@@ -2,16 +2,18 @@
 
 import base64
 import logging
-from typing import Optional
+from typing import Any, List, Optional
 
 from pydantic import Field
 
 from app.schemas.docs import (
     AppendDocumentTextResponse,
     CreateDocumentResponse,
+    DocumentContentItem,
     ExportDocumentResponse,
     InsertDocumentTextResponse,
     ReadDocumentResponse,
+    ReadDocumentsResponse,
     ReplaceDocumentTextResponse,
 )
 from app.tools.common import (
@@ -68,6 +70,45 @@ Outputs: success
         except DriveError as e:
             logger.error(f"read_document failed: {e.message}")
             return ReadDocumentResponse(success=False, error=error_dict(e))
+
+    @mcp.tool()
+    def read_documents(
+        files: Optional[List[Any]] = Field(
+            default=None,
+            description="Array of file objects (e.g. from list_files output 'files' array) or list of file IDs to read.",
+        ),
+        document_ids: Optional[List[str]] = Field(
+            default=None,
+            description="Optional list of document/file IDs to read.",
+        ),
+        credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
+        credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
+    ) -> ReadDocumentsResponse:
+        """Read multiple documents/files as text. Accepts array of files from list_files or document IDs.
+        Supports Google Docs, Word (.docx), and text/xml/json files.
+
+        Capabilities: drive.read_documents
+Outputs: success
+        """
+        try:
+            if credentials_missing(credentials_path, credentials_json):
+                return ReadDocumentsResponse(success=False, error=CREDENTIALS_REQUIRED_ERROR)
+            if not files and not document_ids:
+                return ReadDocumentsResponse(
+                    success=False,
+                    error=error_dict(DriveError("Either 'files' or 'document_ids' must be provided.")),
+                )
+            docs_svc = get_docs(credentials_path, credentials_json)
+            results = docs_svc.read_documents(files=files, document_ids=document_ids)
+            doc_items = [DocumentContentItem(**r) for r in results]
+            return ReadDocumentsResponse(
+                success=True,
+                documents=doc_items,
+                total_count=len(doc_items),
+            )
+        except DriveError as e:
+            logger.error(f"read_documents failed: {e.message}")
+            return ReadDocumentsResponse(success=False, error=error_dict(e))
 
     @mcp.tool()
     def append_document_text(

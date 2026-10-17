@@ -22,6 +22,7 @@ MCP Server for Google Drive and Workspace content (Docs, Sheets, Slides, Forms, 
 |------|-------------|
 | `create_document` | Create a Doc (optional parent folder) |
 | `read_document` | Read Doc as plain text |
+| `read_documents` | Read multiple Docs / Word (.docx) / text files from array (e.g. from `list_files`) |
 | `append_document_text` | Append text at end |
 | `replace_document_text` | Find/replace all |
 | `insert_document_text` | Insert at index (or append) |

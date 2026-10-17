@@ -24,6 +24,23 @@ class ReadDocumentResponse(BaseModel):
     error: Optional[ErrorResponse] = None
 
 
+class DocumentContentItem(BaseModel):
+    document_id: str
+    name: Optional[str] = None
+    title: Optional[str] = None
+    mime_type: Optional[str] = None
+    text: Optional[str] = None
+    success: bool = True
+    error: Optional[str] = None
+
+
+class ReadDocumentsResponse(BaseModel):
+    success: bool
+    documents: list[DocumentContentItem] = Field(default_factory=list)
+    total_count: int = 0
+    error: Optional[ErrorResponse] = None
+
+
 class AppendDocumentTextResponse(BaseModel):
     success: bool
     document_id: Optional[str] = None

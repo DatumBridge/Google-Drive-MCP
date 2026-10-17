@@ -94,11 +94,27 @@
     <h2>List Files</h2>
     <label>Folder ID (leave empty for root)</label>
     <input type="text" id="list-folder-id" placeholder="root">
+    <div style="display: flex; gap: 10px;">
+      <div style="flex: 1;">
+        <label>Page Size</label>
+        <input type="number" id="list-page-size" value="10" min="1" max="1000">
+      </div>
+      <div style="flex: 1;">
+        <label>Page Number</label>
+        <input type="number" id="list-page" value="1" min="1">
+      </div>
+    </div>
+    <label>Page Token (optional)</label>
+    <input type="text" id="list-page-token" placeholder="Optional next_page_token">
     <label>Credentials Path</label>
     <input type="text" id="list-path" placeholder="token.json">
     <label>Credentials JSON (optional)</label>
     <textarea id="list-json" placeholder=""></textarea>
-    <button onclick="callListFiles()">List Files</button>
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+      <button onclick="callListFiles()">List Files</button>
+      <button type="button" onclick="changeListPage(-1)" style="background:#555;">Prev Page</button>
+      <button type="button" onclick="changeListPage(1)" style="background:#555;">Next Page</button>
+    </div>
     <div id="list-result" class="result" style="display:none;"></div>
   </div>
 
@@ -371,18 +387,45 @@
       }
     }
 
+    let lastListNextPageToken = null;
+
     async function callListFiles() {
       try {
         const folderId = document.getElementById('list-folder-id').value?.trim();
+        const pageSize = parseInt(document.getElementById('list-page-size').value, 10) || 10;
+        const page = parseInt(document.getElementById('list-page').value, 10) || 1;
+        const pageToken = document.getElementById('list-page-token').value?.trim();
+
         const args = { ...getCredentials('list-path', 'list-json') };
         if (folderId) args.folder_id = folderId;
+        args.page_size = pageSize;
+        if (pageToken) {
+          args.page_token = pageToken;
+        } else if (page > 1) {
+          args.page = page;
+        }
+
         const result = await mcpCall('tools/call', { name: 'list_files', arguments: args });
         const content = result?.content?.[0]?.text;
         const data = content ? JSON.parse(content) : result;
+        lastListNextPageToken = data?.next_page_token || null;
+        if (data?.next_page_token) {
+          document.getElementById('list-page-token').placeholder = `Next token: ${data.next_page_token.substring(0, 15)}...`;
+        }
         showResult('list-result', data, !data?.success);
       } catch (e) {
         showResult('list-result', e.message, true);
       }
+    }
+
+    function changeListPage(delta) {
+      const pageInput = document.getElementById('list-page');
+      let cur = parseInt(pageInput.value, 10) || 1;
+      let next = Math.max(1, cur + delta);
+      pageInput.value = next;
+      // Reset explicit page_token when changing page number manually
+      document.getElementById('list-page-token').value = '';
+      callListFiles();
     }
 
     async function callUploadFile() {

@@ -21,3 +21,7 @@ google-auth-httplib2>=0.1.1
 
 # Environment Variables
 python-dotenv>=1.2.0
+
+# Document processing
+pypdf>=3.0.0
+

@@ -26,7 +26,9 @@ class FileListResponse(BaseModel):
     success: bool = Field(..., description="Whether operation succeeded")
     files: List[FileMetadata] = Field(default_factory=list, description="List of files/folders")
     total_count: int = Field(default=0, description="Number of items returned")
-    next_page_token: Optional[str] = Field(default=None, description="Token for pagination")
+    page: int = Field(default=1, description="Current page number (1-based)")
+    next_page_token: Optional[str] = Field(default=None, description="Token for next page (from previous list_files response)")
+    has_more: bool = Field(default=False, description="True if there are more files in subsequent pages")
     error: Optional[dict] = Field(default=None, description="Error details if success=False")
 
 

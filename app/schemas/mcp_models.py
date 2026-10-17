@@ -18,6 +18,8 @@ from app.schemas.drive import (
 from app.schemas.docs import (
     CreateDocumentResponse,
     ReadDocumentResponse,
+    DocumentContentItem,
+    ReadDocumentsResponse,
     AppendDocumentTextResponse,
     ReplaceDocumentTextResponse,
     InsertDocumentTextResponse,
@@ -75,6 +77,8 @@ __all__ = [
     "GetMetadataResponse",
     "CreateDocumentResponse",
     "ReadDocumentResponse",
+    "DocumentContentItem",
+    "ReadDocumentsResponse",
     "AppendDocumentTextResponse",
     "ReplaceDocumentTextResponse",
     "InsertDocumentTextResponse",

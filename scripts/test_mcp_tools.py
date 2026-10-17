@@ -57,6 +57,7 @@ EXPECTED_TOOLS = {
     # Docs
     "create_document",
     "read_document",
+    "read_documents",
     "append_document_text",
     "replace_document_text",
     "insert_document_text",

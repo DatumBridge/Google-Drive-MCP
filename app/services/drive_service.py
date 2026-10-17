@@ -89,13 +89,15 @@ class DriveService:
     def list_files(
         self,
         folder_id: Optional[str] = None,
-        page_size: int = 100,
+        page_size: int = 10,
         page_token: Optional[str] = None,
+        page: Optional[int] = 1,
         query: Optional[str] = None,
         include_root_parent: bool = True,
     ) -> Tuple[List[FileMetadata], Optional[str]]:
         """
         List files in a folder or root.
+        Supports page_size (default 10), page number (1-based), or page_token.
         Returns (files, next_page_token).
         """
         try:
@@ -113,12 +115,37 @@ class DriveService:
                 q_parts.append("trashed = false")
             q_str = " and ".join(q_parts) if q_parts else "trashed = false"
 
+            current_page_token = page_token
+            target_page = max(1, page or 1)
+
+            # If page > 1 and page_token is omitted, advance through intermediate pages
+            if not current_page_token and target_page > 1:
+                max_allowed_page = 100
+                if target_page > max_allowed_page:
+                    raise DriveError(f"Page number {target_page} exceeds maximum allowed page ({max_allowed_page})")
+                token = ""
+                for _ in range(1, target_page):
+                    res = (
+                        self.service.files()
+                        .list(
+                            q=q_str,
+                            pageSize=page_size,
+                            pageToken=token or "",
+                            fields="nextPageToken",
+                        )
+                        .execute()
+                    )
+                    token = res.get("nextPageToken")
+                    if not token:
+                        return [], None
+                current_page_token = token
+
             result = (
                 self.service.files()
                 .list(
                     q=q_str,
                     pageSize=page_size,
-                    pageToken=page_token or "",
+                    pageToken=current_page_token or "",
                     fields="nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, parents, webViewLink, trashed)",
                 )
                 .execute()

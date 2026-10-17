@@ -168,7 +168,11 @@ Outputs: success
             default=None,
             description="Folder ID to list (omit for root)",
         ),
-        page_size: int = Field(default=100, description="Max items per page (1-1000)"),
+        page_size: int = Field(default=10, description="Max items per page (1-1000, default: 10)"),
+        page: Optional[int] = Field(
+            default=1,
+            description="Page number (1-based, default: 1). If page > 1 and page_token is omitted, navigates directly to that page.",
+        ),
         page_token: Optional[str] = Field(
             default=None,
             description="Token for next page (from previous list_files response)",
@@ -180,19 +184,22 @@ Outputs: success
     ) -> FileListResponse:
         """
         List files and folders in a Google Drive folder.
-        Returns file metadata including id, name, mimeType, size, timestamps.
+        Returns file metadata including id, name, mimeType, size, timestamps, next_page_token, and has_more.
         
 
         Capabilities: drive.list_files
 Outputs: success
         """
-        logger.info(f"MCP: Listing files in folder={folder_id}, page_size={page_size}")
+        logger.info(f"MCP: Listing files in folder={folder_id}, page_size={page_size}, page={page}, page_token={page_token}")
         try:
             if credentials_missing(credentials_path, credentials_json):
                 return FileListResponse(
                     success=False,
                     files=[],
                     total_count=0,
+                    page=page or 1,
+                    next_page_token=None,
+                    has_more=False,
                     error=CREDENTIALS_REQUIRED_ERROR,
                 )
             drive_service = get_drive(credentials_path, credentials_json)
@@ -200,13 +207,16 @@ Outputs: success
                 folder_id=folder_id,
                 page_size=min(max(page_size, 1), 1000),
                 page_token=page_token,
+                page=page,
                 query=query,
             )
             return FileListResponse(
                 success=True,
                 files=files,
                 total_count=len(files),
+                page=page or 1,
                 next_page_token=next_token,
+                has_more=bool(next_token),
             )
         except DriveError as e:
             logger.error(f"List files failed: {e.message}")
@@ -214,6 +224,9 @@ Outputs: success
                 success=False,
                 files=[],
                 total_count=0,
+                page=page or 1,
+                next_page_token=None,
+                has_more=False,
                 error=error_dict(e),
             )
 
