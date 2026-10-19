@@ -22,6 +22,7 @@ When reading contents of multiple files (e.g. after list_files) or extracting te
 |---|---|---|---|---|---|
 | `files` | no | array | `[{"id": "1gWfrb5pK...", "name": "spec.docx", "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}]` | list_files → files | Array of file objects from list_files or dicts with id |
 | `document_ids` | no | array | `["1gWfrb5pKfxtU-jmgGdAQKzhtD9bv5CHE"]` | list_files → files[0].id | Optional list of document or file ID strings |
+| `as_text` | no | boolean | `true` | — | If true, extracts and returns plain text from Google Docs, docx, pdf, xml, and text files (default true) |
 
 **Related tool** (optional): when the user did not supply this id, Deep runs the named producer on the same MCP server and binds the output field (`tool` → `field`, machine-read as `x-datumbridge-related-tool` + `x-datumbridge-output-field` on the JSON Schema property). Use a concrete bind path (`id`, `boards[0].id`). Leave `—` for free-text, enums, and values only the user can give. Samples stay shapes; never send `"example-id"` live.
 
@@ -67,6 +68,7 @@ Input:
 
 ```json
 {
+  "as_text": true,
   "files": [
     {
       "id": "1gWfrb5pKfxtU-jmgGdAQKzhtD9bv5CHE",

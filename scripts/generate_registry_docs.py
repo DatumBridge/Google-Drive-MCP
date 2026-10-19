@@ -222,6 +222,7 @@ TOOL_SPECS: Dict[str, Dict[str, Any]] = {
         "params": [
             ("files", "no", "array", '[{"id": "1gWfrb5pK...", "name": "spec.docx", "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}]', "list_files → files", "Array of file objects from list_files or dicts with id"),
             ("document_ids", "no", "array", '["1gWfrb5pKfxtU-jmgGdAQKzhtD9bv5CHE"]', "list_files → files[0].id", "Optional list of document or file ID strings"),
+            ("as_text", "no", "boolean", "true", "—", "If true, extracts and returns plain text from Google Docs, docx, pdf, xml, and text files (default true)"),
         ],
         "success_fields": [
             ("success", "true", "Whether batch read succeeded"),
@@ -230,6 +231,7 @@ TOOL_SPECS: Dict[str, Dict[str, Any]] = {
         ],
         "extra_error_codes": [],
         "typical_call": {
+            "as_text": True,
             "files": [
                 {
                     "id": "1gWfrb5pKfxtU-jmgGdAQKzhtD9bv5CHE",

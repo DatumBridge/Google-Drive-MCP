@@ -81,6 +81,10 @@ Outputs: success
             default=None,
             description="Optional list of document/file IDs to read.",
         ),
+        as_text: Optional[bool] = Field(
+            default=True,
+            description="Whether to extract and return document content as text (default True).",
+        ),
         credentials_path: Optional[str] = Field(default=None, description="Path to OAuth token JSON"),
         credentials_json: Optional[str] = Field(default=None, description="OAuth token JSON string"),
     ) -> ReadDocumentsResponse:
