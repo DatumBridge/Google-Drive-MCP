@@ -61,3 +61,8 @@ Input is unchanged: `spreadsheet_id`, `range` (A1). On success, `range` is the a
 | `PAYLOAD_TOO_LARGE` | Size limit | no |
 | `UNSUPPORTED_EXPORT` | draw.io PNG/PDF | no |
 | `CONFIRMATION_REQUIRED` | Destructive action needs `confirm=true` | no |
+
+## `GET /register`
+
+Remote gateway install card. HTTP 200 JSON with `server_id`, `name`, `version`, and `tools[]` (same fields as `tools/list`). No session.
+

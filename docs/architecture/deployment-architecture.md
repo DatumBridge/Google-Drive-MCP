@@ -4,7 +4,7 @@
 
 - HTTP: `uvicorn app.mcp_server:http_app --host 0.0.0.0 --port 8000`
 - Stdio: `python -m app.mcp_server`
-- Docker image exposes port 8000; health at `/health`
+- Docker image exposes port 8000; health at `/health`; remote gateway at `/register`
 
 ## Credentials
 

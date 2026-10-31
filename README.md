@@ -123,6 +123,7 @@ docker run -p 8000:8000 google-drive-mcp
 ```
 
 - **Health check**: `curl http://localhost:8000/health` returns `{"status":"ok","service":"google-drive-mcp"}`
+- **Register**: `curl http://localhost:8000/register` returns the remote-gateway install card
 - **MCP endpoints**: Available at `/mcp/` (Streamable HTTP) and `/sse/` (SSE transport)
 - Credentials are passed per tool invocation (credentials_path or credentials_json)
 

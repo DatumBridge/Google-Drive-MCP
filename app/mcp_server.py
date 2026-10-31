@@ -19,7 +19,7 @@ from starlette.routing import Mount, Route
 
 from app.oauth_routes import oauth_callback, oauth_info, oauth_start, oauth_token
 from app.tools import register_all
-from app.capability_bind import bind_declared_capabilities
+from app.capability_bind import bind_declared_capabilities, build_register_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,14 @@ async def health(request):
     return JSONResponse({"status": "ok", "service": "google-drive-mcp"})
 
 
+async def register(request):
+    return JSONResponse(
+        build_register_manifest(
+            mcp, server_id="google-drive", name="Google Drive MCP", version="1.0.0"
+        )
+    )
+
+
 async def test_ui(request):
     """Serve the manual test UI for MCP tools."""
     ui_path = Path(__file__).resolve().parent.parent / "static" / "test-ui.html"
@@ -64,6 +72,7 @@ async def test_ui(request):
 http_app = Starlette(
     routes=[
         Route("/health", health),
+        Route("/register", register),
         Route("/test", test_ui),
         Route("/oauth/start", oauth_start),
         Route("/oauth/callback", oauth_callback),
